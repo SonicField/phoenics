@@ -20,3 +20,4 @@ build/
 .nbs/*-last-run
 .nbs/control-registry-*
 .nbs/*.lock
+tests/scale/
