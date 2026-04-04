@@ -61,9 +61,7 @@ static int load_type_manifest(const char *path,
         char *saveptr = NULL;
         char *tok = strtok_r(line, " \t\n", &saveptr);
         if (!tok || strcmp(tok, "descr") != 0) {
-            fprintf(stderr, "phc: error: invalid manifest line in '%s'\n", path);
-            fclose(f);
-            return 0;
+            continue; /* Skip unknown keywords for forward-compatibility */
         }
 
         tok = strtok_r(NULL, " \t\n", &saveptr);
@@ -191,6 +189,10 @@ int main(int argc, char **argv) {
     }
 
     char *output = codegen(&result.program);
+    /* Free semantic result BEFORE external types: analyse() copies name
+     * pointers (not strings) from external_types into its type table,
+     * and semantic_result_free() frees the pointer arrays but not the
+     * strings themselves — those are owned by external_types. */
     semantic_result_free(&sem);
     free_external_types(external_types, external_count);
     if (!output) {
