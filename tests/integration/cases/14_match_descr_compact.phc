@@ -1,0 +1,9 @@
+#include <stdio.h>
+
+descr X { A { int v; }, B { int w; } };
+
+int main(void) {
+    X x = X_mk_A(42);
+    match_descr(X, x) { case A: { printf("%d\n", x.A.v); } break; case B: { printf("%d\n", x.B.w); } break; }
+    return 0;
+}

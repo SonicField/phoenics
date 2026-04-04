@@ -100,34 +100,49 @@ static void emit_match_descr(Buffer *buf, const Program *prog,
         pos = m->cases[i].name_pos + m->cases[i].name_len;
     }
 
-    /* Copy from after last case variant name to just before the last \n before } */
-    /* Find the last \n before the closing } */
+    /* Copy from after last case variant name to just before the closing }.
+     * Split at the last \n so we can insert default: break; before the
+     * closing brace's indentation. Clamp searches to within the match body
+     * (lbrace_pos+1) to avoid walking into preceding source on single-line input. */
+    size_t body_lower = m->lbrace_pos + 1;
     size_t last_nl = m->rbrace_pos;
-    while (last_nl > pos && src[last_nl - 1] != '\n') last_nl--;
+    while (last_nl > body_lower && src[last_nl - 1] != '\n') last_nl--;
 
-    /* Copy body text up to the last newline (exclusive of closing indent) */
-    buf_append_n(buf, src + pos, last_nl - pos);
+    int has_newline = (last_nl > body_lower);
 
-    /* Insert "default: break;\n" with same indentation as case labels */
+    if (has_newline) {
+        /* Multi-line: copy body up to last newline */
+        buf_append_n(buf, src + pos, last_nl - pos);
+    } else {
+        /* Single-line: copy all body text before closing } */
+        buf_append_n(buf, src + pos, m->rbrace_pos - pos);
+    }
+
+    /* Insert "default: break;" with same indentation as case labels */
     if (m->case_count > 0) {
-        /* Find the 'case' keyword before the first variant name. */
         size_t first_name = m->cases[0].name_pos;
         size_t case_kw = first_name;
-        while (case_kw > 0 && src[case_kw - 1] == ' ') case_kw--;
+        while (case_kw > body_lower && src[case_kw - 1] == ' ') case_kw--;
         if (case_kw >= 4) case_kw -= 4;
 
-        /* Find line start before case keyword */
+        /* Find line start before case keyword, clamped to body */
         size_t line_start = case_kw;
-        while (line_start > 0 && src[line_start - 1] != '\n') line_start--;
+        while (line_start > body_lower && src[line_start - 1] != '\n') line_start--;
 
-        buf_append_n(buf, src + line_start, case_kw - line_start);
-        buf_append(buf, "    default: break;\n");
+        if (has_newline) {
+            buf_append_n(buf, src + line_start, case_kw - line_start);
+            buf_append(buf, "    default: break;\n");
+        } else {
+            buf_append(buf, " default: break; ");
+        }
     }
 
     /* Emit closing brace with its original indentation */
-    size_t close_line = m->rbrace_pos;
-    while (close_line > 0 && src[close_line - 1] != '\n') close_line--;
-    buf_append_n(buf, src + close_line, m->rbrace_pos - close_line);
+    if (has_newline) {
+        size_t close_line = m->rbrace_pos;
+        while (close_line > body_lower && src[close_line - 1] != '\n') close_line--;
+        buf_append_n(buf, src + close_line, m->rbrace_pos - close_line);
+    }
     buf_append(buf, "}");
 }
 
