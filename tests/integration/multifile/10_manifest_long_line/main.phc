@@ -1,4 +1,3 @@
-/* Manifest line exceeds 4096-byte fgets buffer.
- * phc must either handle it correctly or error explicitly.
- * Silent truncation is a bug — it defeats exhaustive matching. */
+/* Manifest line exceeds 4096 bytes (300 variants, 4514-byte line).
+ * getline() must handle this correctly — no silent truncation. */
 int main(void) { return 0; }
