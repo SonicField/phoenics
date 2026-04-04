@@ -1,13 +1,13 @@
 #include <stdio.h>
 
-descr Result {
+phc_descr Result {
     Ok { int value; },
     Err { int code; const char *message; }
 };
 
 int main(void) {
     Result r = Result_mk_Ok(42);
-    match_descr(Result, r) {
+    phc_match(Result, r) {
         case Ok: {
             printf("ok: %d\n", r.Ok.value);
         } break;

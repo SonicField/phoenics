@@ -1,12 +1,12 @@
 #include <stdio.h>
 
-descr Color {
+phc_descr Color {
     Red {},
     Green {},
     Blue {}
 };
 
-/* Raw switch on descr tag — NOT match_descr.
+/* Raw switch on phc_descr tag — NOT phc_match.
  * PHC must NOT enforce exhaustiveness here.
  * The switch passes through unchanged. */
 int main(void) {

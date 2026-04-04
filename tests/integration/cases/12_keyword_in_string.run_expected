@@ -1,1 +1,1 @@
-descr Shape { Circle { double radius; } };
+phc_descr Shape { Circle { double radius; } };

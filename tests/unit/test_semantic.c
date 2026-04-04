@@ -19,7 +19,7 @@
 /* === Type table building === */
 
 TEST(sem_builds_type_table) {
-    const char *src = "descr Shape { Circle { double r; }, Rect { int w; } };";
+    const char *src = "phc_descr Shape { Circle { double r; }, Rect { int w; } };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -35,8 +35,8 @@ TEST(sem_builds_type_table) {
 
 TEST(sem_builds_multiple_types) {
     const char *src =
-        "descr A { X { int a; } };\n"
-        "descr B { Y { int b; }, Z { int c; } };\n";
+        "phc_descr A { X { int a; } };\n"
+        "phc_descr B { Y { int b; }, Z { int c; } };\n";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -51,7 +51,7 @@ TEST(sem_builds_multiple_types) {
 /* === Descr validation === */
 
 TEST(sem_error_duplicate_variant_name) {
-    const char *src = "descr Bad { A { int x; }, A { int y; } };";
+    const char *src = "phc_descr Bad { A { int x; }, A { int y; } };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -66,15 +66,15 @@ TEST(sem_error_duplicate_variant_name) {
 
 TEST(sem_error_duplicate_descr_name) {
     const char *src =
-        "descr Dup { A { int x; } };\n"
-        "descr Dup { B { int y; } };\n";
+        "phc_descr Dup { A { int x; } };\n"
+        "phc_descr Dup { B { int y; } };\n";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
     SemanticResult sr = analyse(&pr.program);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
-    ASSERT_STR_CONTAINS(sr.error_message, "duplicate descr");
+    ASSERT_STR_CONTAINS(sr.error_message, "duplicate phc_descr");
 
     semantic_result_free(&sr);
     parse_result_free(&pr);
@@ -84,8 +84,8 @@ TEST(sem_error_duplicate_descr_name) {
 
 TEST(sem_match_descr_exhaustive_pass) {
     const char *src =
-        "descr Shape { Circle { double r; }, Rect { int w; } };\n"
-        "match_descr(Shape, s) {\n"
+        "phc_descr Shape { Circle { double r; }, Rect { int w; } };\n"
+        "phc_match(Shape, s) {\n"
         "    case Circle: { break; }\n"
         "    case Rect: { break; }\n"
         "}\n";
@@ -101,8 +101,8 @@ TEST(sem_match_descr_exhaustive_pass) {
 
 TEST(sem_match_descr_missing_variant) {
     const char *src =
-        "descr Shape { Circle { double r; }, Rect { int w; }, Tri { double b; } };\n"
-        "match_descr(Shape, s) {\n"
+        "phc_descr Shape { Circle { double r; }, Rect { int w; }, Tri { double b; } };\n"
+        "phc_match(Shape, s) {\n"
         "    case Circle: { break; }\n"
         "    case Rect: { break; }\n"
         "}\n";
@@ -120,8 +120,8 @@ TEST(sem_match_descr_missing_variant) {
 
 TEST(sem_match_descr_multiple_missing) {
     const char *src =
-        "descr ABCD { A {}, B {}, C {}, D {} };\n"
-        "match_descr(ABCD, v) {\n"
+        "phc_descr ABCD { A {}, B {}, C {}, D {} };\n"
+        "phc_match(ABCD, v) {\n"
         "    case A: { break; }\n"
         "}\n";
     ParseResult pr = parse(src);
@@ -141,8 +141,8 @@ TEST(sem_match_descr_multiple_missing) {
 
 TEST(sem_match_descr_duplicate_case) {
     const char *src =
-        "descr AB { A { int x; }, B { int y; } };\n"
-        "match_descr(AB, v) {\n"
+        "phc_descr AB { A { int x; }, B { int y; } };\n"
+        "phc_match(AB, v) {\n"
         "    case A: { break; }\n"
         "    case B: { break; }\n"
         "    case A: { break; }\n"
@@ -161,7 +161,7 @@ TEST(sem_match_descr_duplicate_case) {
 
 TEST(sem_match_descr_unknown_type) {
     const char *src =
-        "match_descr(NoSuchType, x) {\n"
+        "phc_match(NoSuchType, x) {\n"
         "    case Foo: { break; }\n"
         "}\n";
     ParseResult pr = parse(src);
@@ -179,8 +179,8 @@ TEST(sem_match_descr_unknown_type) {
 TEST(sem_match_descr_unknown_variant_in_case) {
     /* All variants present plus an extra that doesn't exist in the descr */
     const char *src =
-        "descr AB { A { int x; }, B { int y; } };\n"
-        "match_descr(AB, v) {\n"
+        "phc_descr AB { A { int x; }, B { int y; } };\n"
+        "phc_match(AB, v) {\n"
         "    case A: { break; }\n"
         "    case B: { break; }\n"
         "    case C: { break; }\n"
@@ -202,7 +202,7 @@ TEST(sem_match_descr_unknown_variant_in_case) {
 
 TEST(sem_no_match_descr_passes) {
     const char *src =
-        "descr Shape { Circle { double r; } };\n"
+        "phc_descr Shape { Circle { double r; } };\n"
         "int main(void) { return 0; }\n";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);

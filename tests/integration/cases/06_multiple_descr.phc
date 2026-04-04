@@ -1,12 +1,12 @@
 #include <stdio.h>
 
-descr Color {
+phc_descr Color {
     Red {},
     Green {},
     Blue {}
 };
 
-descr Value {
+phc_descr Value {
     Integer { int n; },
     Float { double f; },
     String { const char *s; }
@@ -15,12 +15,12 @@ descr Value {
 int main(void) {
     Color c = Color_mk_Red();
     Value v = Value_mk_Integer(42);
-    match_descr(Color, c) {
+    phc_match(Color, c) {
         case Red:   { printf("red\n"); } break;
         case Green: { printf("green\n"); } break;
         case Blue:  { printf("blue\n"); } break;
     }
-    match_descr(Value, v) {
+    phc_match(Value, v) {
         case Integer: { printf("int: %d\n", v.Integer.n); } break;
         case Float:   { printf("float: %f\n", v.Float.f); } break;
         case String:  { printf("string: %s\n", v.String.s); } break;

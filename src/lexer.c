@@ -149,9 +149,9 @@ static Token lexer_next_scan(Lexer *lex) {
             }
             size_t id_len = id_end - id_start;
 
-            /* Check for Phoenics keywords */
-            if (check_keyword(lex, id_start, id_len, "descr", 5) ||
-                check_keyword(lex, id_start, id_len, "match_descr", 11)) {
+            /* Check for Phoenics keywords (phc_ prefixed — no collision risk) */
+            if (check_keyword(lex, id_start, id_len, "phc_descr", 9) ||
+                check_keyword(lex, id_start, id_len, "phc_match", 9)) {
                 /* Keyword found! Emit TOK_OTHER for text before it, if any */
                 if (id_start > start) {
                     return make_token(TOK_OTHER, lex->src + start,
@@ -167,7 +167,7 @@ static Token lexer_next_scan(Lexer *lex) {
                 lex->brace_depth = 0;
                 lex->depth_zero_seen = 0;
 
-                if (id_len == 5) {
+                if (id_len == 9 && lex->src[id_start + 4] == 'd') {
                     return make_token(TOK_DESCR, lex->src + id_start,
                                       id_len, id_start, kline, kcol);
                 } else {
@@ -292,9 +292,9 @@ static Token lexer_next_struct(Lexer *lex) {
         size_t len = lex->pos - start;
         const char *val = lex->src + start;
 
-        if (len == 5 && memcmp(val, "descr", 5) == 0)
+        if (len == 9 && memcmp(val, "phc_descr", 9) == 0)
             return make_token(TOK_DESCR, val, len, start, sline, scol);
-        if (len == 11 && memcmp(val, "match_descr", 11) == 0)
+        if (len == 9 && memcmp(val, "phc_match", 9) == 0)
             return make_token(TOK_MATCH_DESCR, val, len, start, sline, scol);
         if (len == 4 && memcmp(val, "case", 4) == 0)
             return make_token(TOK_CASE, val, len, start, sline, scol);

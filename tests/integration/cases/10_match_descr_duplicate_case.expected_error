@@ -1,1 +1,1 @@
-duplicate case 'A' in match_descr on 'AB'
+duplicate case 'A' in phc_match on 'AB'

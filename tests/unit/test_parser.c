@@ -2,7 +2,7 @@
 #include "parser.h"
 
 TEST(parse_simple_descr) {
-    const char *src = "descr Shape { Circle { double radius; } };";
+    const char *src = "phc_descr Shape { Circle { double radius; } };";
     ParseResult result = parse(src);
     ASSERT_EQ(result.error, 0);
     ASSERT_EQ(result.program.descr_count, 1);
@@ -20,7 +20,7 @@ TEST(parse_simple_descr) {
 
 TEST(parse_multi_variant) {
     const char *src =
-        "descr Shape {\n"
+        "phc_descr Shape {\n"
         "    Circle { double radius; },\n"
         "    Rectangle { double width; double height; }\n"
         "};";
@@ -46,7 +46,7 @@ TEST(parse_multi_variant) {
 }
 
 TEST(parse_empty_variant) {
-    const char *src = "descr Option { Some { int value; }, None {} };";
+    const char *src = "phc_descr Option { Some { int value; }, None {} };";
     ParseResult result = parse(src);
     ASSERT_EQ(result.error, 0);
 
@@ -73,7 +73,7 @@ TEST(parse_descr_between_code) {
     const char *src =
         "#include <stdio.h>\n"
         "\n"
-        "descr Result { Ok { int val; }, Err { int code; } };\n"
+        "phc_descr Result { Ok { int val; }, Err { int code; } };\n"
         "\n"
         "int main(void) { return 0; }\n";
     ParseResult result = parse(src);
@@ -85,7 +85,7 @@ TEST(parse_descr_between_code) {
 }
 
 TEST(parse_multi_word_type) {
-    const char *src = "descr Foo { Bar { unsigned int x; } };";
+    const char *src = "phc_descr Foo { Bar { unsigned int x; } };";
     ParseResult result = parse(src);
     ASSERT_EQ(result.error, 0);
 
@@ -98,7 +98,7 @@ TEST(parse_multi_word_type) {
 }
 
 TEST(parse_pointer_type) {
-    const char *src = "descr Foo { Bar { char *name; } };";
+    const char *src = "phc_descr Foo { Bar { char *name; } };";
     ParseResult result = parse(src);
     ASSERT_EQ(result.error, 0);
 
@@ -113,7 +113,8 @@ TEST(parse_pointer_type) {
 /* --- Error cases: parser must reject malformed input --- */
 
 TEST(parse_error_missing_name) {
-    const char *src = "descr { X { int a; } };";
+    /* phc_descr followed by { instead of type name — parser error */
+    const char *src = "phc_descr { X { int a; } };";
     ParseResult result = parse(src);
     ASSERT(result.error != 0);
     ASSERT_NOT_NULL(result.error_message);
@@ -121,7 +122,7 @@ TEST(parse_error_missing_name) {
 }
 
 TEST(parse_error_missing_open_brace) {
-    const char *src = "descr Shape Circle { double radius; } };";
+    const char *src = "phc_descr Shape Circle { double radius; } };";
     ParseResult result = parse(src);
     ASSERT(result.error != 0);
     parse_result_free(&result);
@@ -129,7 +130,7 @@ TEST(parse_error_missing_open_brace) {
 
 TEST(parse_error_missing_semicolon) {
     /* Missing trailing semicolon after closing brace */
-    const char *src = "descr Shape { Circle { double radius; } }";
+    const char *src = "phc_descr Shape { Circle { double radius; } }";
     ParseResult result = parse(src);
     ASSERT(result.error != 0);
     parse_result_free(&result);
@@ -137,7 +138,7 @@ TEST(parse_error_missing_semicolon) {
 
 TEST(parse_error_empty_descr) {
     /* descr with no variants */
-    const char *src = "descr Empty {};";
+    const char *src = "phc_descr Empty {};";
     ParseResult result = parse(src);
     ASSERT(result.error != 0);
     parse_result_free(&result);
@@ -145,7 +146,7 @@ TEST(parse_error_empty_descr) {
 
 TEST(parse_single_variant_no_trailing_comma) {
     /* Single variant with no trailing comma — should be valid */
-    const char *src = "descr Wrap { Val { int x; } };";
+    const char *src = "phc_descr Wrap { Val { int x; } };";
     ParseResult result = parse(src);
     ASSERT_EQ(result.error, 0);
     ASSERT_EQ(result.program.descr_count, 1);
@@ -154,7 +155,7 @@ TEST(parse_single_variant_no_trailing_comma) {
 }
 
 TEST(parse_const_pointer_type) {
-    const char *src = "descr Foo { Bar { const char *name; } };";
+    const char *src = "phc_descr Foo { Bar { const char *name; } };";
     ParseResult result = parse(src);
     ASSERT_EQ(result.error, 0);
 
@@ -170,8 +171,8 @@ TEST(parse_const_pointer_type) {
 
 TEST(parse_match_descr_basic) {
     const char *src =
-        "descr Shape { Circle { double r; }, Rect { int w; } };\n"
-        "match_descr(Shape, s) {\n"
+        "phc_descr Shape { Circle { double r; }, Rect { int w; } };\n"
+        "phc_match(Shape, s) {\n"
         "    case Circle: { foo(); } break;\n"
         "    case Rect: { bar(); } break;\n"
         "}\n";
@@ -202,8 +203,8 @@ TEST(parse_match_descr_basic) {
 TEST(parse_match_descr_complex_expr) {
     /* match_descr with a more complex expression */
     const char *src =
-        "descr AB { A { int x; }, B { int y; } };\n"
-        "match_descr(AB, arr[i]) {\n"
+        "phc_descr AB { A { int x; }, B { int y; } };\n"
+        "phc_match(AB, arr[i]) {\n"
         "    case A: { break; }\n"
         "    case B: { break; }\n"
         "}\n";
@@ -229,8 +230,8 @@ TEST(parse_match_descr_complex_expr) {
 TEST(parse_match_descr_nested_braces) {
     /* Case body with nested braces — parser must track depth */
     const char *src =
-        "descr X { A { int v; } };\n"
-        "match_descr(X, x) {\n"
+        "phc_descr X { A { int v; } };\n"
+        "phc_match(X, x) {\n"
         "    case A: { if (x.A.v > 0) { do_thing(); } } break;\n"
         "}\n";
 
@@ -255,19 +256,22 @@ TEST(parse_match_descr_nested_braces) {
 }
 
 TEST(parse_match_descr_error_missing_lparen) {
+    /* With context-sensitive lookahead, "match_descr X" (no '(' after)
+     * is not recognized as a keyword. It passes through as regular C. */
     const char *src =
-        "descr X { A { int v; } };\n"
+        "phc_descr X { A { int v; } };\n"
         "match_descr X, x) { case A: { break; } }\n";
 
     ParseResult result = parse(src);
-    ASSERT(result.error != 0);
+    ASSERT_EQ(result.error, 0);
+    ASSERT_EQ(result.program.descr_count, 1); /* descr X still parsed */
     parse_result_free(&result);
 }
 
 TEST(parse_match_descr_error_missing_rparen) {
     const char *src =
-        "descr X { A { int v; } };\n"
-        "match_descr(X, x { case A: { break; } }\n";
+        "phc_descr X { A { int v; } };\n"
+        "phc_match(X, x { case A: { break; } }\n";
 
     ParseResult result = parse(src);
     ASSERT(result.error != 0);

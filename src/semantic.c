@@ -40,7 +40,7 @@ SemanticResult analyse(const Program *prog) {
     for (int i = 0; i < prog->descr_count && !sr.error; i++) {
         for (int j = i + 1; j < prog->descr_count && !sr.error; j++) {
             if (strcmp(prog->descrs[i].name, prog->descrs[j].name) == 0) {
-                sem_error(&sr, "duplicate descr type '%s'", prog->descrs[i].name);
+                sem_error(&sr, "duplicate phc_descr type '%s'", prog->descrs[i].name);
             }
         }
     }
@@ -72,7 +72,7 @@ SemanticResult analyse(const Program *prog) {
             }
         }
         if (!d) {
-            sem_error(&sr, "unknown descr type '%s'", m->type_name);
+            sem_error(&sr, "unknown phc_descr type '%s'", m->type_name);
             break;
         }
 
@@ -80,7 +80,7 @@ SemanticResult analyse(const Program *prog) {
         for (int i = 0; i < m->case_count && !sr.error; i++) {
             for (int j = i + 1; j < m->case_count && !sr.error; j++) {
                 if (strcmp(m->cases[i].variant_name, m->cases[j].variant_name) == 0) {
-                    sem_error(&sr, "duplicate case '%s' in match_descr on '%s'",
+                    sem_error(&sr, "duplicate case '%s' in phc_match on '%s'",
                               m->cases[i].variant_name, m->type_name);
                 }
             }
@@ -96,7 +96,7 @@ SemanticResult analyse(const Program *prog) {
                 }
             }
             if (!found) {
-                sem_error(&sr, "unknown variant '%s' in match_descr on '%s'",
+                sem_error(&sr, "unknown variant '%s' in phc_match on '%s'",
                           m->cases[i].variant_name, m->type_name);
             }
         }
@@ -112,7 +112,7 @@ SemanticResult analyse(const Program *prog) {
             }
             if (!found) {
                 sem_error(&sr,
-                          "non-exhaustive match_descr on '%s': missing variant '%s'",
+                          "non-exhaustive phc_match on '%s': missing variant '%s'",
                           m->type_name, d->variants[vi].name);
             }
         }

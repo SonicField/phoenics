@@ -9,7 +9,7 @@ static int contains(const char *haystack, const char *needle) {
 }
 
 TEST(codegen_tag_enum) {
-    const char *src = "descr Shape { Circle { double radius; }, Rect { int w; } };";
+    const char *src = "phc_descr Shape { Circle { double radius; }, Rect { int w; } };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -25,7 +25,7 @@ TEST(codegen_tag_enum) {
 }
 
 TEST(codegen_struct_with_union) {
-    const char *src = "descr Shape { Circle { double radius; } };";
+    const char *src = "phc_descr Shape { Circle { double radius; } };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -42,7 +42,7 @@ TEST(codegen_struct_with_union) {
 }
 
 TEST(codegen_constructor_functions) {
-    const char *src = "descr Shape { Circle { double radius; } };";
+    const char *src = "phc_descr Shape { Circle { double radius; } };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -58,7 +58,7 @@ TEST(codegen_constructor_functions) {
 }
 
 TEST(codegen_empty_variant_constructor) {
-    const char *src = "descr Option { Some { int value; }, None {} };";
+    const char *src = "phc_descr Option { Some { int value; }, None {} };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -87,8 +87,8 @@ TEST(codegen_passthrough_preserved) {
 
 TEST(codegen_multiple_descrs) {
     const char *src =
-        "descr A { X { int a; } };\n"
-        "descr B { Y { int b; } };\n";
+        "phc_descr A { X { int a; } };\n"
+        "phc_descr B { Y { int b; } };\n";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -104,7 +104,7 @@ TEST(codegen_multiple_descrs) {
 }
 
 TEST(codegen_multi_field_constructor) {
-    const char *src = "descr P { Point { int x; int y; int z; } };";
+    const char *src = "phc_descr P { Point { int x; int y; int z; } };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -123,7 +123,7 @@ TEST(codegen_descr_between_code_ordering) {
     /* Verify that codegen preserves ordering: header, descr expansion, footer */
     const char *src =
         "#include <stdio.h>\n"
-        "descr V { A { int x; } };\n"
+        "phc_descr V { A { int x; } };\n"
         "int main(void) { return 0; }\n";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
@@ -148,7 +148,7 @@ TEST(codegen_descr_between_code_ordering) {
 /* --- __COUNT sentinel --- */
 
 TEST(codegen_count_sentinel) {
-    const char *src = "descr Shape { Circle { double r; }, Rect { int w; } };";
+    const char *src = "phc_descr Shape { Circle { double r; }, Rect { int w; } };";
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
@@ -164,8 +164,8 @@ TEST(codegen_count_sentinel) {
 
 TEST(codegen_match_descr_generates_switch) {
     const char *src =
-        "descr Shape { Circle { double r; }, Rect { int w; } };\n"
-        "match_descr(Shape, s) {\n"
+        "phc_descr Shape { Circle { double r; }, Rect { int w; } };\n"
+        "phc_match(Shape, s) {\n"
         "    case Circle: { foo(); } break;\n"
         "    case Rect: { bar(); } break;\n"
         "}\n";
@@ -188,8 +188,8 @@ TEST(codegen_match_descr_generates_switch) {
 
 TEST(codegen_match_descr_preserves_body) {
     const char *src =
-        "descr AB { A { int x; }, B { int y; } };\n"
-        "match_descr(AB, v) {\n"
+        "phc_descr AB { A { int x; }, B { int y; } };\n"
+        "phc_match(AB, v) {\n"
         "    case A: { printf(\"%d\", v.A.x); } break;\n"
         "    case B: { printf(\"%d\", v.B.y); } break;\n"
         "}\n";

@@ -27,25 +27,25 @@
 
 TEST(lex_descr_keyword) {
     Lexer lex;
-    lexer_init(&lex, "descr");
+    lexer_init(&lex, "phc_descr Shape");
     Token tok = lexer_next(&lex);
     ASSERT_EQ(tok.type, TOK_DESCR);
-    ASSERT_STRN_EQ(tok.value, tok.length, "descr");
+    ASSERT_STRN_EQ(tok.value, tok.length, "phc_descr");
 }
 
 TEST(lex_match_descr_keyword) {
     Lexer lex;
-    lexer_init(&lex, "match_descr");
+    lexer_init(&lex, "phc_match(X, v)");
     Token tok = lexer_next(&lex);
     ASSERT_EQ(tok.type, TOK_MATCH_DESCR);
-    ASSERT_STRN_EQ(tok.value, tok.length, "match_descr");
+    ASSERT_STRN_EQ(tok.value, tok.length, "phc_match");
 }
 
 /* === Structural tokens in descr context (structured mode) === */
 
 TEST(lex_braces_in_descr) {
     Lexer lex;
-    lexer_init(&lex, "descr X { };");
+    lexer_init(&lex, "phc_descr X { };");
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_DESCR);
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_IDENT);
@@ -56,7 +56,7 @@ TEST(lex_braces_in_descr) {
 
 TEST(lex_semicolon_comma_in_descr) {
     Lexer lex;
-    lexer_init(&lex, "descr X { A { int a; }, B { int b; } };");
+    lexer_init(&lex, "phc_descr X { A { int a; }, B { int b; } };");
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_DESCR);
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_IDENT); /* X */
@@ -74,7 +74,7 @@ TEST(lex_semicolon_comma_in_descr) {
 TEST(lex_star_in_descr) {
     /* Pointer field type — star tokenised in structured mode */
     Lexer lex;
-    lexer_init(&lex, "descr F { B { char *name; } };");
+    lexer_init(&lex, "phc_descr F { B { char *name; } };");
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_DESCR);
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_IDENT); /* F */
@@ -90,7 +90,7 @@ TEST(lex_star_in_descr) {
 
 TEST(lex_identifier_in_descr) {
     Lexer lex;
-    lexer_init(&lex, "descr Shape");
+    lexer_init(&lex, "phc_descr Shape");
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_DESCR);
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_IDENT);
@@ -101,7 +101,7 @@ TEST(lex_identifier_in_descr) {
 
 TEST(lex_parens_in_match_descr) {
     Lexer lex;
-    lexer_init(&lex, "match_descr(X, v)");
+    lexer_init(&lex, "phc_match(X, v)");
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_MATCH_DESCR);
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_LPAREN);
@@ -113,7 +113,7 @@ TEST(lex_parens_in_match_descr) {
 
 TEST(lex_case_in_match_descr) {
     Lexer lex;
-    lexer_init(&lex, "match_descr(X, v) { case A: break; }");
+    lexer_init(&lex, "phc_match(X, v) { case A: break; }");
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_MATCH_DESCR);
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_LPAREN);
@@ -144,7 +144,7 @@ TEST(lex_eof) {
 
 TEST(lex_descr_declaration) {
     Lexer lex;
-    lexer_init(&lex, "descr Shape { Circle { double radius; } };");
+    lexer_init(&lex, "phc_descr Shape { Circle { double radius; } };");
 
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_DESCR);
@@ -167,7 +167,7 @@ TEST(lex_descr_declaration) {
 
 TEST(lex_match_descr_full_syntax) {
     Lexer lex;
-    lexer_init(&lex, "match_descr(Shape, s) { case Circle: { x(); } break; case Rect: { y(); } break; }");
+    lexer_init(&lex, "phc_match(Shape, s) { case Circle: { x(); } break; case Rect: { y(); } break; }");
 
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_MATCH_DESCR);
@@ -216,7 +216,7 @@ TEST(lex_passthrough_case_break) {
 
 TEST(lex_passthrough_before_descr) {
     Lexer lex;
-    lexer_init(&lex, "#include <stdio.h>\n\ndescr Shape { };");
+    lexer_init(&lex, "#include <stdio.h>\n\nphc_descr Shape { };");
     Token t1 = lexer_next(&lex);
     ASSERT_EQ(t1.type, TOK_OTHER);
     Token t2 = lexer_next(&lex);
@@ -226,7 +226,7 @@ TEST(lex_passthrough_before_descr) {
 TEST(lex_passthrough_between_constructs) {
     /* Code between two descr declarations is passthrough */
     Lexer lex;
-    lexer_init(&lex, "descr A { X { int a; } };\nint gap;\ndescr B { Y { int b; } };");
+    lexer_init(&lex, "phc_descr A { X { int a; } };\nint gap;\nphc_descr B { Y { int b; } };");
     Token tok;
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_DESCR); /* descr A */
     /* Skip through A's tokens until we're past the construct */
@@ -243,7 +243,7 @@ TEST(lex_passthrough_between_constructs) {
 
 TEST(lex_tracks_line_numbers) {
     Lexer lex;
-    lexer_init(&lex, "descr\nShape");
+    lexer_init(&lex, "phc_descr\nShape");
     Token t1 = lexer_next(&lex);
     Token t2 = lexer_next(&lex);
     ASSERT_EQ(t1.line, 1);
@@ -254,7 +254,7 @@ TEST(lex_tracks_line_numbers) {
 
 TEST(lex_descr_in_string_literal) {
     Lexer lex;
-    lexer_init(&lex, "char *s = \"descr Shape { };\";");
+    lexer_init(&lex, "char *s = \"phc_descr Shape { };\";");
     Token tok = lexer_next(&lex);
     ASSERT_EQ(tok.type, TOK_OTHER);
     tok = lexer_next(&lex);
@@ -270,21 +270,21 @@ TEST(lex_descr_in_char_literal) {
 
 TEST(lex_descr_in_line_comment) {
     Lexer lex;
-    lexer_init(&lex, "// descr Shape { }\nint x;");
+    lexer_init(&lex, "// phc_descr Shape { }\nint x;");
     Token tok = lexer_next(&lex);
     ASSERT_EQ(tok.type, TOK_OTHER);
 }
 
 TEST(lex_descr_in_block_comment) {
     Lexer lex;
-    lexer_init(&lex, "/* descr Shape { } */\nint x;");
+    lexer_init(&lex, "/* phc_descr Shape { } */\nint x;");
     Token tok = lexer_next(&lex);
     ASSERT_EQ(tok.type, TOK_OTHER);
 }
 
 TEST(lex_match_descr_in_string) {
     Lexer lex;
-    lexer_init(&lex, "printf(\"match_descr test\");");
+    lexer_init(&lex, "printf(\"phc_match test\");");
     Token tok = lexer_next(&lex);
     ASSERT_EQ(tok.type, TOK_OTHER);
 }
@@ -292,18 +292,25 @@ TEST(lex_match_descr_in_string) {
 /* === Edge cases === */
 
 TEST(lex_descr_as_prefix) {
-    /* "description" starts with "descr" — must NOT trigger structured mode */
+    /* "phc_descr_extended" starts with "phc_descr" — must NOT trigger */
     Lexer lex;
-    lexer_init(&lex, "description");
+    lexer_init(&lex, "phc_descr_extended");
     Token tok = lexer_next(&lex);
-    /* In passthrough mode, this is just passthrough text */
     ASSERT_EQ(tok.type, TOK_OTHER);
 }
 
 TEST(lex_match_descr_as_prefix) {
-    /* "match_description" starts with "match_descr" — must NOT trigger */
+    /* "phc_matcher" starts with "phc_match" — must NOT trigger */
     Lexer lex;
-    lexer_init(&lex, "match_description");
+    lexer_init(&lex, "phc_matcher");
+    Token tok = lexer_next(&lex);
+    ASSERT_EQ(tok.type, TOK_OTHER);
+}
+
+TEST(lex_old_keywords_are_passthrough) {
+    /* Old 'descr' and 'match_descr' (without phc_ prefix) are NOT keywords */
+    Lexer lex;
+    lexer_init(&lex, "int descr = 42; match_descr();");
     Token tok = lexer_next(&lex);
     ASSERT_EQ(tok.type, TOK_OTHER);
 }
@@ -311,7 +318,7 @@ TEST(lex_match_descr_as_prefix) {
 TEST(lex_descr_after_passthrough_returns_to_passthrough) {
     /* After a descr construct ends, the lexer returns to passthrough mode */
     Lexer lex;
-    lexer_init(&lex, "descr X { A { int a; } };\nint y = 0;");
+    lexer_init(&lex, "phc_descr X { A { int a; } };\nint y = 0;");
     Token tok;
     /* Consume the descr construct */
     tok = lexer_next(&lex); ASSERT_EQ(tok.type, TOK_DESCR);
@@ -363,5 +370,6 @@ TEST_MAIN(
     /* Edge cases */
     RUN_TEST(lex_descr_as_prefix);
     RUN_TEST(lex_match_descr_as_prefix);
+    RUN_TEST(lex_old_keywords_are_passthrough);
     RUN_TEST(lex_descr_after_passthrough_returns_to_passthrough);
 )

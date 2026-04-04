@@ -1,13 +1,13 @@
 #include <stdio.h>
 
-descr Option_int {
+phc_descr Option_int {
     Some { int value; },
     None {}
 };
 
 int main(void) {
     Option_int x = Option_int_mk_Some(42);
-    match_descr(Option_int, x) {
+    phc_match(Option_int, x) {
         case Some: {
             printf("got %d\n", x.Some.value);
         } break;

@@ -1,4 +1,4 @@
-descr Shape {
+phc_descr Shape {
     Circle { double radius; },
     Rectangle { double width; double height; },
     Triangle { double base; double height; }
@@ -7,7 +7,7 @@ descr Shape {
 int main(void) {
     Shape s = Shape_mk_Circle(1.0);
     /* Missing Triangle case — PHC must reject this */
-    match_descr(Shape, s) {
+    phc_match(Shape, s) {
         case Circle: { break; }
         case Rectangle: { break; }
     }

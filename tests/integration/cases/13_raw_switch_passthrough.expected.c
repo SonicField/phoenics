@@ -34,7 +34,7 @@ static inline Color Color_mk_Blue(void) {
     return _v;
 }
 
-/* Raw switch on descr tag — NOT match_descr.
+/* Raw switch on phc_descr tag — NOT phc_match.
  * PHC must NOT enforce exhaustiveness here.
  * The switch passes through unchanged. */
 int main(void) {

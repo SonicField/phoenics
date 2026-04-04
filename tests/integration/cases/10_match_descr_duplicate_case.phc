@@ -1,11 +1,11 @@
-descr AB {
+phc_descr AB {
     A { int x; },
     B { int y; }
 };
 
 int main(void) {
     AB v = AB_mk_A(1);
-    match_descr(AB, v) {
+    phc_match(AB, v) {
         case A: { break; }
         case B: { break; }
         case A: { break; }
