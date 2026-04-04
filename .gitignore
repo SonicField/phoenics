@@ -8,16 +8,8 @@ build/
 .vscode/
 .idea/
 
-# NBS transient files
-.nbs/pids/
-.nbs/events/processed/
-.nbs/events/.dedup.lock
-.nbs/logs/
-.nbs/chat/*.lock
-.nbs/chat/*.cursors
-.nbs/sessions/
-.nbs/nbs-claude-*.log
-.nbs/*-last-run
-.nbs/control-registry-*
-.nbs/*.lock
+# NBS — operational tooling, not project source
+# Contains chat history, skill definitions, scribe logs, symlinks to local paths
+# Must NOT be in a public repo
+.nbs/
 tests/scale/

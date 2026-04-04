@@ -13,7 +13,7 @@ LIB_OBJS = $(filter-out $(BUILDDIR)/main.o,$(OBJS))
 UNIT_SRCS = $(wildcard $(TESTDIR)/unit/*.c)
 UNIT_BINS = $(patsubst $(TESTDIR)/unit/%.c,$(BUILDDIR)/test_%,$(UNIT_SRCS))
 
-.PHONY: all clean test test-unit test-integration
+.PHONY: all clean test test-unit test-integration test-selfhost test-roundtrip
 
 all: $(BUILDDIR)/phc
 
@@ -30,7 +30,7 @@ $(BUILDDIR)/phc: $(OBJS) | $(BUILDDIR)
 $(BUILDDIR)/test_%: $(TESTDIR)/unit/%.c $(LIB_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR) $< $(LIB_OBJS) -o $@
 
-test: test-unit test-integration
+test: test-unit test-integration test-selfhost
 
 test-unit: $(UNIT_BINS)
 	@echo "=== Unit Tests ==="
@@ -45,6 +45,18 @@ test-unit: $(UNIT_BINS)
 test-integration: $(BUILDDIR)/phc
 	@echo "=== Integration Tests ==="
 	@$(TESTDIR)/integration/run_tests.sh $(BUILDDIR)/phc
+
+# Self-hosting: phc must pass through its own source unchanged
+test-selfhost: $(BUILDDIR)/phc
+	@echo "=== Self-Hosting Round-Trip Test ==="
+	@$(TESTDIR)/integration/roundtrip_test.sh $(BUILDDIR)/phc $(SRCDIR)
+
+# Passthrough round-trip test against real C files
+# Usage: make test-roundtrip ROUNDTRIP_DIR=tests/scale/
+ROUNDTRIP_DIR ?= tests/scale
+test-roundtrip: $(BUILDDIR)/phc
+	@echo "=== Passthrough Round-Trip Test ==="
+	@$(TESTDIR)/integration/roundtrip_test.sh $(BUILDDIR)/phc $(ROUNDTRIP_DIR)
 
 # Verify the test framework itself works correctly
 test-self:

@@ -1,53 +1,36 @@
 # Phoenics Language Reference
 
-Version: 1.0 (v1)
-Date: 2026-04-04
+Phoenics adds discriminated unions to C11. `phc` translates Phoenics-extended C into standard C11. The output compiles with clang or gcc.
 
-## 1. Overview
+Phoenics is for AI agents writing C. The syntax is unambiguous, explicit, and mechanically verifiable. Human ergonomics are secondary.
 
-Phoenics is a language extension for C11 that adds discriminated unions (sum types) as a first-class type. It is implemented by `phc`, a source-to-source translator that accepts Phoenics-extended C and emits standard C11.
-
-Phoenics is designed for AI agents writing C code. The syntax prioritises unambiguous parsing, explicit structure, and mechanical verifiability over human ergonomics.
-
-### 1.1 Pipeline Position
+## Pipeline
 
 ```
 source.phc  -->  phc  -->  source.c  -->  cc (clang/gcc)
 ```
 
-phc operates on original source files BEFORE the C preprocessor. It transforms Phoenics extensions into standard C11 and passes all other code through byte-for-byte unchanged. The output `.c` file then enters the normal compile pipeline.
+phc runs before the preprocessor. Everything that is not a Phoenics construct passes through byte-for-byte unchanged. `#include`, comments, string literals, preprocessor directives — untouched.
 
-### 1.2 Reserved Keywords
-
-Phoenics reserves two keywords: `phc_descr` and `phc_match`. These MUST NOT be used as identifiers in Phoenics source files. All other C identifiers (including `descr` and `match_descr`) are unreserved.
+Two reserved keywords: `phc_descr` and `phc_match`. All other C identifiers are unreserved.
 
 ---
 
-## 2. Discriminated Union Declaration (`phc_descr`)
+## `phc_descr` — Discriminated Union
 
-### 2.1 Syntax
+### Syntax
 
 ```
 phc_descr <TypeName> {
-    <VariantName> { <field-declarations> },
-    <VariantName> { <field-declarations> },
+    <Variant> { <type> <field>; ... },
+    <Variant> { <type> <field>; ... },
     ...
 };
 ```
 
-### 2.2 Rules
+At least one variant. Variants separated by commas. Fields follow C declaration syntax. Supported field types: identifiers, multi-word qualifiers (`unsigned int`), pointers (`char *`). No function pointers or arrays in v1.
 
-- `TypeName` MUST be a valid C identifier.
-- EXACTLY ONE or more variants MUST be present. Zero variants is an error.
-- Each `VariantName` MUST be a valid C identifier, unique within the phc_descr.
-- Each variant CONTAINS ZERO OR MORE field declarations.
-- Each field declaration follows C syntax: type followed by name followed by semicolon.
-- Supported field types: simple identifiers (`int`, `double`), multi-word qualifiers (`unsigned int`, `const char`), and pointer types (`char *`, `const char *`).
-- Unsupported field types (v1): function pointers, arrays, nested phc_descr.
-- Variants are separated by commas. The last variant MAY omit the trailing comma.
-- The declaration ends with `};`.
-
-### 2.3 Example
+### Example
 
 ```c
 phc_descr Shape {
@@ -57,11 +40,11 @@ phc_descr Shape {
 };
 ```
 
-### 2.4 Generated C11
+### What phc generates
 
-For each `phc_descr`, phc generates four components:
+Four things. No magic — the output is readable C.
 
-**1. Tag enumeration:**
+**Tag enum:**
 ```c
 typedef enum {
     Shape_Circle,
@@ -71,9 +54,9 @@ typedef enum {
 } Shape_Tag;
 ```
 
-The `<Type>__COUNT` sentinel enables runtime tag validation: `assert(v.tag < Shape__COUNT)`.
+`__COUNT` is a sentinel for runtime tag validation: `assert(v.tag < Shape__COUNT)`.
 
-**2. Struct with anonymous union:**
+**Struct with anonymous union:**
 ```c
 typedef struct {
     Shape_Tag tag;
@@ -85,11 +68,9 @@ typedef struct {
 } Shape;
 ```
 
-The anonymous union (C11) allows direct field access: `v.Circle.radius`.
+Anonymous unions are C11. Access fields directly: `v.Circle.radius`. Empty variants get `struct { char _empty; }` because C forbids zero-size structs.
 
-Empty variants generate `struct { char _empty; }` (C forbids zero-size structs).
-
-**3. Constructor functions:**
+**Constructors:**
 ```c
 static inline Shape Shape_mk_Circle(double radius) {
     Shape _v;
@@ -99,65 +80,56 @@ static inline Shape Shape_mk_Circle(double radius) {
 }
 ```
 
-One constructor per variant. Empty variants take `void`: `Shape_mk_None(void)`.
+One per variant. Empty variants take `void`.
 
-**4. Safe accessor macros:**
+**Safe accessors:**
 ```c
 #define Shape_as_Circle(v) \
     (assert((v).tag == Shape_Circle && "Shape: expected Circle"), \
      (v).Circle)
 ```
 
-One accessor per variant. Usage: `Shape_as_Circle(s).radius`. The assertion fires at runtime if the tag does not match.
+Asserts the tag at runtime, then returns the variant struct. Usage: `Shape_as_Circle(s).radius`. The macro evaluates `v` twice — use simple lvalues, not function calls.
 
-**Caveat:** The accessor macro evaluates `v` twice. The argument MUST be a simple lvalue, not a function call or expression with side effects.
+### Naming
 
-### 2.5 Naming Conventions
-
-| Generated name | Pattern | Example |
-|----------------|---------|---------|
-| Tag enum type | `<Type>_Tag` | `Shape_Tag` |
-| Tag enum value | `<Type>_<Variant>` | `Shape_Circle` |
-| Variant count | `<Type>__COUNT` | `Shape__COUNT` |
+| What | Pattern | Example |
+|------|---------|---------|
+| Tag type | `<Type>_Tag` | `Shape_Tag` |
+| Tag value | `<Type>_<Variant>` | `Shape_Circle` |
+| Count sentinel | `<Type>__COUNT` | `Shape__COUNT` |
 | Struct type | `<Type>` | `Shape` |
 | Constructor | `<Type>_mk_<Variant>` | `Shape_mk_Circle` |
-| Safe accessor | `<Type>_as_<Variant>` | `Shape_as_Circle` |
+| Accessor | `<Type>_as_<Variant>` | `Shape_as_Circle` |
 
 ---
 
-## 3. Exhaustive Match (`phc_match`)
+## `phc_match` — Exhaustive Match
 
-### 3.1 Syntax
+### Syntax
 
 ```
 phc_match(<TypeName>, <expr>) {
-    case <VariantName>: { <body> } break;
-    case <VariantName>: { <body> } break;
+    case <Variant>: { <body> } break;
+    case <Variant>: { <body> } break;
     ...
 }
 ```
 
-### 3.2 Rules
+Every variant must appear. Missing one is a phc error. Duplicates are an error. Unknown variant names are an error. No `default` — exhaustiveness is the point.
 
-- `TypeName` MUST reference a `phc_descr` declared earlier in the same file.
-- `expr` is any C expression that evaluates to a value of type `TypeName`.
-- Every variant of `TypeName` MUST have a corresponding case. Missing variants cause a phc error.
-- Duplicate cases cause a phc error.
-- Unknown variant names cause a phc error.
-- No `default` case is permitted. Exhaustive matching is mandatory.
-- Each case body MUST be enclosed in braces.
-- Each case MUST end with `break;`.
+The type must be a `phc_descr` declared earlier in the same file.
 
-### 3.3 Example
+### Example
 
 ```c
 phc_match(Shape, s) {
     case Circle: {
-        printf("circle radius=%g\n", Shape_as_Circle(s).radius);
+        printf("r=%g\n", Shape_as_Circle(s).radius);
     } break;
     case Rectangle: {
-        printf("rect %gx%g\n", Shape_as_Rectangle(s).width,
-                                Shape_as_Rectangle(s).height);
+        printf("%gx%g\n", Shape_as_Rectangle(s).width,
+                           Shape_as_Rectangle(s).height);
     } break;
     case Triangle: {
         printf("triangle\n");
@@ -165,43 +137,30 @@ phc_match(Shape, s) {
 }
 ```
 
-### 3.4 Generated C11
+### Generated C
 
-phc transforms `phc_match` into a standard `switch` statement:
+A standard `switch`:
 
 ```c
 switch (s.tag) {
-    case Shape_Circle: {
-        printf("circle radius=%g\n", Shape_as_Circle(s).radius);
-    } break;
-    case Shape_Rectangle: {
-        printf("rect %gx%g\n", Shape_as_Rectangle(s).width,
-                                Shape_as_Rectangle(s).height);
-    } break;
-    case Shape_Triangle: {
-        printf("triangle\n");
-    } break;
+    case Shape_Circle: { ... } break;
+    case Shape_Rectangle: { ... } break;
+    case Shape_Triangle: { ... } break;
     default: break;
 }
 ```
 
-The `default: break;` handles the `__COUNT` sentinel to suppress `-Wswitch` warnings.
+The `default: break;` suppresses `-Wswitch` warnings from the `__COUNT` sentinel.
 
-### 3.5 Enforcement
+### What it enforces
 
-The value of `phc_match` is enforcement at transpile time:
-
-- **Adding a variant** to a `phc_descr` causes every `phc_match` on that type (in the same file) to fail until updated. This prevents the "we thought this was X but it's Y" class of bugs.
-- **Removing a variant** causes `phc_match` cases referencing it to fail as "unknown variant."
-- **Typos in variant names** are caught as "unknown variant" errors.
-
-This is analogous to Pascal's exhaustive case checking on variant records.
+Add a variant to a `phc_descr` and every `phc_match` on that type breaks until updated. Remove a variant and cases referencing it fail as "unknown variant." Typos are caught. This is the same safety as Pascal's exhaustive case checking — applied to C.
 
 ---
 
-## 4. Common Patterns
+## Patterns
 
-### 4.1 Option Type
+### Option
 
 ```c
 phc_descr Option_int {
@@ -213,39 +172,18 @@ Option_int maybe_divide(int a, int b) {
     if (b == 0) return Option_int_mk_None();
     return Option_int_mk_Some(a / b);
 }
-
-void use_result(Option_int r) {
-    phc_match(Option_int, r) {
-        case Some: {
-            printf("result: %d\n", Option_int_as_Some(r).value);
-        } break;
-        case None: {
-            printf("division by zero\n");
-        } break;
-    }
-}
 ```
 
-### 4.2 Result Type
+### Result
 
 ```c
 phc_descr Result {
     Ok { int value; },
     Err { int code; const char *message; }
 };
-
-Result parse_int(const char *s) {
-    char *end;
-    long val = strtol(s, &end, 10);
-    if (*end != '\0')
-        return Result_mk_Err(1, "invalid character");
-    if (val > INT_MAX || val < INT_MIN)
-        return Result_mk_Err(2, "out of range");
-    return Result_mk_Ok((int)val);
-}
 ```
 
-### 4.3 AST Node
+### Recursive (AST nodes)
 
 ```c
 phc_descr Expr {
@@ -255,40 +193,27 @@ phc_descr Expr {
 };
 ```
 
-Note: recursive types use pointers (`Expr *`). The C compiler enforces this — a struct cannot contain itself by value.
+Recursive types must use pointers. The C compiler rejects a struct that contains itself by value.
 
 ---
 
-## 5. Error Messages
+## Errors
 
-| Error | Meaning |
-|-------|---------|
-| `non-exhaustive phc_match on '<Type>': missing variant '<Variant>'` | A phc_match does not cover all variants |
-| `duplicate case '<Variant>' in phc_match on '<Type>'` | Same variant appears twice in phc_match |
-| `unknown descr type '<Type>'` | phc_match references a type not declared in this file |
-| `unknown variant '<Variant>' in phc_match on '<Type>'` | Case names a variant that doesn't exist in the phc_descr |
-| `duplicate variant '<Variant>' in descr '<Type>'` | Two variants share a name within a phc_descr |
-| `descr '<Type>' must have at least one variant` | Empty phc_descr |
-
----
-
-## 6. Known Limitations (v1)
-
-1. **Single-file constraint.** `phc_match` can only reference `phc_descr` types declared in the same file. Cross-file usage requires raw `switch` without exhaustiveness checking.
-2. **No `#line` directives.** C compiler errors reference phc output line numbers, not original source.
-3. **No pattern destructuring.** Case bodies access fields via `<Type>_as_<Variant>(expr).field`, not via bound variables.
-4. **No conditional compilation interaction.** `#ifdef` around `phc_descr` variants is not supported.
-5. **Field types limited to** identifiers, multi-word qualifiers, and pointer types. Function pointers and arrays are not supported as field types.
+| Message | Cause |
+|---------|-------|
+| `non-exhaustive phc_match on '<T>': missing variant '<V>'` | Match does not cover all variants |
+| `duplicate case '<V>' in phc_match on '<T>'` | Same variant listed twice |
+| `unknown descr type '<T>'` | Type not declared in this file |
+| `unknown variant '<V>' in phc_match on '<T>'` | Variant does not exist in the type |
+| `duplicate variant '<V>' in descr '<T>'` | Two variants share a name |
+| `descr '<T>' must have at least one variant` | Empty declaration |
 
 ---
 
-## 7. Passthrough Guarantee
+## Limitations (v1)
 
-All C code that is not part of a `phc_descr` or `phc_match` construct passes through phc byte-for-byte unchanged. This includes:
-
-- Preprocessor directives (`#include`, `#define`, `#ifdef`)
-- Comments (line and block)
-- String and character literals (even those containing `phc_descr` or `phc_match`)
-- All C syntax, operators, and expressions
-
-phc will never modify, reformat, or reorder non-Phoenics code.
+1. **Single-file.** `phc_match` only sees `phc_descr` types from the same file. Cross-file usage falls back to raw `switch`.
+2. **No `#line`.** Compiler errors reference phc output, not original source.
+3. **No destructuring.** Access fields via `Type_as_Variant(v).field`, not bound variables.
+4. **No `#ifdef` interaction.** Conditional variants are not supported.
+5. **Field types.** Identifiers, qualifiers, pointers. No function pointers or arrays.
