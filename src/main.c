@@ -52,8 +52,9 @@ static int load_type_manifest(const char *path,
         fprintf(stderr, "phc: error: cannot open manifest '%s'\n", path);
         return 0;
     }
-    char line[4096];
-    while (fgets(line, (int)sizeof(line), f)) {
+    char *line = NULL;
+    size_t line_cap = 0;
+    while (getline(&line, &line_cap, f) != -1) {
         /* Skip comments and blank lines */
         if (line[0] == '#' || line[0] == '\n' || line[0] == '\0') continue;
 
@@ -67,6 +68,7 @@ static int load_type_manifest(const char *path,
         tok = strtok_r(NULL, " \t\n", &saveptr);
         if (!tok) {
             fprintf(stderr, "phc: error: missing type name in manifest '%s'\n", path);
+            free(line);
             fclose(f);
             return 0;
         }
@@ -89,6 +91,7 @@ static int load_type_manifest(const char *path,
             fprintf(stderr, "phc: error: type '%s' has no variants in manifest '%s'\n",
                     dt.name, path);
             free((void *)dt.name);
+            free(line);
             fclose(f);
             return 0;
         }
@@ -99,6 +102,7 @@ static int load_type_manifest(const char *path,
         }
         (*types)[(*count)++] = dt;
     }
+    free(line);
     fclose(f);
     return 1;
 }

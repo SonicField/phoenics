@@ -1,4 +1,4 @@
-/* Test: manifest line exceeds 4096 bytes.
- * If fgets truncates, later variants are lost.
- * phc_match should see ALL 300 variants. */
+/* Manifest line exceeds 4096-byte fgets buffer.
+ * phc must either handle it correctly or error explicitly.
+ * Silent truncation is a bug — it defeats exhaustive matching. */
 int main(void) { return 0; }
