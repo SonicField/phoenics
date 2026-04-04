@@ -1,0 +1,8 @@
+#include <stdio.h>
+
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+
+int x = UNDECLARED_IN_PIPELINE;
