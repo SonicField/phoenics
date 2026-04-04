@@ -374,7 +374,7 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
     Chunk c;
     memset(&c, 0, sizeof(c));
     c.type = CHUNK_MATCH_DESCR;
-    c.match_descr = m;
+    c.match = m;
     DA_PUSH(p->chunks, p->chunk_count, p->chunk_cap, c);
 
     p->passthrough_start = m.end_pos;
@@ -442,7 +442,7 @@ void parse_result_free(ParseResult *result) {
     for (int i = 0; i < result->program.chunk_count; i++) {
         Chunk *c = &result->program.chunks[i];
         if (c->type == CHUNK_MATCH_DESCR) {
-            MatchDescr *m = &c->match_descr;
+            MatchDescr *m = &c->match;
             free(m->type_name);
             free(m->expr_text);
             for (int j = 0; j < m->case_count; j++) {

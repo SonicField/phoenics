@@ -163,7 +163,7 @@ char *codegen(const Program *prog) {
             emit_descr(&buf, &prog->descrs[c->descr_index]);
             break;
         case CHUNK_MATCH_DESCR:
-            emit_match_descr(&buf, prog, &c->match_descr);
+            emit_match_descr(&buf, prog, &c->match);
             break;
         }
     }

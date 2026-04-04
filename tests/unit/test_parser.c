@@ -184,7 +184,7 @@ TEST(parse_match_descr_basic) {
     int found_match = 0;
     for (int i = 0; i < result.program.chunk_count; i++) {
         if (result.program.chunks[i].type == CHUNK_MATCH_DESCR) {
-            MatchDescr *m = &result.program.chunks[i].match_descr;
+            MatchDescr *m = &result.program.chunks[i].match;
             ASSERT_STR_EQ(m->type_name, "Shape");
             ASSERT_STR_EQ(m->expr_text, "s");
             ASSERT_EQ(m->case_count, 2);
@@ -214,7 +214,7 @@ TEST(parse_match_descr_complex_expr) {
     int found_match = 0;
     for (int i = 0; i < result.program.chunk_count; i++) {
         if (result.program.chunks[i].type == CHUNK_MATCH_DESCR) {
-            MatchDescr *m = &result.program.chunks[i].match_descr;
+            MatchDescr *m = &result.program.chunks[i].match;
             ASSERT_STR_EQ(m->type_name, "AB");
             ASSERT_STR_EQ(m->expr_text, "arr[i]");
             found_match = 1;
@@ -240,7 +240,7 @@ TEST(parse_match_descr_nested_braces) {
     int found_match = 0;
     for (int i = 0; i < result.program.chunk_count; i++) {
         if (result.program.chunks[i].type == CHUNK_MATCH_DESCR) {
-            MatchDescr *m = &result.program.chunks[i].match_descr;
+            MatchDescr *m = &result.program.chunks[i].match;
             ASSERT_EQ(m->case_count, 1);
             ASSERT_STR_EQ(m->cases[0].variant_name, "A");
             /* The body text should contain the nested braces */

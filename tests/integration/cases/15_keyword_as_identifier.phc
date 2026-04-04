@@ -1,0 +1,7 @@
+/* Test that 'descr' and 'match_descr' as C identifiers don't trigger parsing.
+ * Per architecture: these are reserved words. This test documents the
+ * current behavior — phc errors on this input. */
+struct foo {
+    int descr;
+    int match_descr;
+};

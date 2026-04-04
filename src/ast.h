@@ -50,7 +50,7 @@ typedef struct {
     union {
         struct { size_t start; size_t end; } passthrough;
         int descr_index;
-        MatchDescr match_descr;
+        MatchDescr match;
     };
 } Chunk;
 

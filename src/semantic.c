@@ -61,7 +61,7 @@ SemanticResult analyse(const Program *prog) {
     /* Validate match_descr constructs */
     for (int ci = 0; ci < prog->chunk_count && !sr.error; ci++) {
         if (prog->chunks[ci].type != CHUNK_MATCH_DESCR) continue;
-        const MatchDescr *m = &prog->chunks[ci].match_descr;
+        const MatchDescr *m = &prog->chunks[ci].match;
 
         /* Find the descr type */
         const DescrDecl *d = NULL;
