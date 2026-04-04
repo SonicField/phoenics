@@ -46,6 +46,8 @@ static inline Val_Str_t Val_as_Str(Val v) {
     if (v.tag != Val_Str) abort();
     return v.Str;
 }
+#line 6
+
 
 int main(void) {
     Val v = Val_mk_Int(99);
@@ -60,5 +62,7 @@ int main(void) {
         } break;
             default: break;
     }
+#line 20
+
     return 0;
 }

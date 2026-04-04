@@ -212,6 +212,7 @@ static int parse_descr(Parser *p) {
     }
     size_t end_pos = p->cur.pos + 1;
     next_token(p);
+    d.end_line = p->cur.line;
 
     int idx = p->descr_count;
     DA_PUSH(p->descrs, p->descr_count, p->descr_cap, d);
@@ -372,6 +373,7 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
     m.rbrace_pos = p->cur.pos;
     m.end_pos = p->cur.pos + 1;
     next_token(p);
+    m.end_line = p->cur.line;
 
     Chunk c;
     memset(&c, 0, sizeof(c));

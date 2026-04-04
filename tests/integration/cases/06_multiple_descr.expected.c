@@ -61,6 +61,8 @@ static inline Color_Blue_t Color_as_Blue(Color v) {
     if (v.tag != Color_Blue) abort();
     return v.Blue;
 }
+#line 7
+
 
 typedef enum {
     Value_Integer,
@@ -125,6 +127,8 @@ static inline Value_String_t Value_as_String(Value v) {
     if (v.tag != Value_String) abort();
     return v.String;
 }
+#line 13
+
 
 int main(void) {
     Color c = Color_mk_Red();
@@ -135,11 +139,15 @@ int main(void) {
         case Color_Blue:  { printf("blue\n"); } break;
             default: break;
     }
+#line 23
+
     switch (v.tag) {
         case Value_Integer: { printf("int: %d\n", v.Integer.n); } break;
         case Value_Float:   { printf("float: %f\n", v.Float.f); } break;
         case Value_String:  { printf("string: %s\n", v.String.s); } break;
             default: break;
     }
+#line 28
+
     return 0;
 }

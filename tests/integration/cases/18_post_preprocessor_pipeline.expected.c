@@ -49,6 +49,8 @@ static inline Result_Err_t Result_as_Err(Result v) {
     if (v.tag != Result_Err) abort();
     return v.Err;
 }
+#line 9
+
 
 int main(void) {
     Result r = Result_mk_Ok(42);
@@ -63,6 +65,8 @@ int main(void) {
         case Result_Err: { printf("match err: %s\n", r.Err.msg); } break;
             default: break;
     }
+#line 24
+
 
     return 0;
 }

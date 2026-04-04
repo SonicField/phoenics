@@ -52,6 +52,8 @@ static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
     if (v.tag != Shape_Rectangle) abort();
     return v.Rectangle;
 }
+#line 10
+
 
 int main(void) {
     /* Verify correct accessor works */

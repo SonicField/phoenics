@@ -48,6 +48,8 @@ static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
     if (v.tag != Shape_Rectangle) abort();
     return v.Rectangle;
 }
+#line 6
+
 
 int main(void) {
     Shape s = Shape_mk_Circle(3.14);
@@ -60,5 +62,7 @@ int main(void) {
         } break;
             default: break;
     }
+#line 18
+
     return 0;
 }

@@ -46,9 +46,13 @@ static inline X_B_t X_as_B(X v) {
     if (v.tag != X_B) abort();
     return v.B;
 }
+#line 3
+
 
 int main(void) {
     X x = X_mk_A(42);
     switch (x.tag) { case X_A: { printf("%d\n", x.A.v); } break; case X_B: { printf("%d\n", x.B.w); } break;  default: break; }
+#line 8
+
     return 0;
 }

@@ -61,6 +61,8 @@ static inline Color_Blue_t Color_as_Blue(Color v) {
     if (v.tag != Color_Blue) abort();
     return v.Blue;
 }
+#line 7
+
 
 /* Raw switch on phc_descr tag — NOT phc_match.
  * PHC must NOT enforce exhaustiveness here.

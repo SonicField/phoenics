@@ -18,6 +18,7 @@ typedef struct {
     char *name;
     Variant *variants;
     int variant_count;
+    int end_line;       /* source line after closing ';' */
 } DescrDecl;
 
 typedef struct {
@@ -37,6 +38,7 @@ typedef struct {
     size_t lbrace_pos;      /* position of opening '{' */
     size_t rbrace_pos;      /* position of closing '}' */
     size_t end_pos;         /* position after closing '}' */
+    int end_line;           /* source line after closing '}' */
 } MatchDescr;
 
 typedef enum {

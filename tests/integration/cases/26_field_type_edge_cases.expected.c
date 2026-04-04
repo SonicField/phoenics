@@ -84,6 +84,8 @@ static inline Value_Pair_t Value_as_Pair(Value v) {
     if (v.tag != Value_Pair) abort();
     return v.Pair;
 }
+#line 8
+
 
 int main(void) {
     /* Test pointer-to-pointer */
@@ -97,6 +99,8 @@ int main(void) {
         case Value_Pair: { printf("pair: %d,%d\n", v1.Pair.x, v1.Pair.y); } break;
             default: break;
     }
+#line 22
+
 
     /* Test const char * */
     Value v2 = Value_mk_ConstStr("hello");
@@ -107,6 +111,8 @@ int main(void) {
         case Value_Pair: { printf("pair\n"); } break;
             default: break;
     }
+#line 31
+
 
     /* Test unsigned long long */
     Value v3 = Value_mk_BigNum(18446744073709551615ULL);
@@ -117,6 +123,8 @@ int main(void) {
         case Value_Pair: { printf("pair\n"); } break;
             default: break;
     }
+#line 40
+
 
     /* Test accessor on correct variant */
     Value_Pair_t pair = Value_as_Pair(Value_mk_Pair(10, 20));

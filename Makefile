@@ -13,7 +13,7 @@ LIB_OBJS = $(filter-out $(BUILDDIR)/main.o,$(OBJS))
 UNIT_SRCS = $(wildcard $(TESTDIR)/unit/*.c)
 UNIT_BINS = $(patsubst $(TESTDIR)/unit/%.c,$(BUILDDIR)/test_%,$(UNIT_SRCS))
 
-.PHONY: all clean test test-unit test-integration test-multifile test-fidelity test-selfhost test-pipeline test-roundtrip
+.PHONY: all clean test test-unit test-integration test-multifile test-fidelity test-line test-selfhost test-pipeline test-roundtrip
 
 all: $(BUILDDIR)/phc
 
@@ -50,6 +50,11 @@ test-integration: $(BUILDDIR)/phc
 test-fidelity: $(BUILDDIR)/phc
 	@echo "=== Passthrough Fidelity Tests ==="
 	@$(TESTDIR)/integration/passthrough_fidelity_test.sh $(BUILDDIR)/phc
+
+# #line directive tests (P2 — compiler error line number verification)
+test-line: $(BUILDDIR)/phc
+	@echo "=== #line Directive Tests ==="
+	@$(TESTDIR)/integration/line_directive_test.sh $(BUILDDIR)/phc
 
 # Multi-file integration tests (v2 type manifests)
 test-multifile: $(BUILDDIR)/phc

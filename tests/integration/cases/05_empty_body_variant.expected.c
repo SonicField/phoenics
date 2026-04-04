@@ -43,3 +43,5 @@ static inline Maybe_int_Nothing_t Maybe_int_as_Nothing(Maybe_int v) {
     if (v.tag != Maybe_int_Nothing) abort();
     return v.Nothing;
 }
+#line 4
+

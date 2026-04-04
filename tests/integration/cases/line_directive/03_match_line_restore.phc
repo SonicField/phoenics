@@ -1,0 +1,14 @@
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+
+void f(Shape s) {
+    phc_match(Shape, s) {
+        case Circle: {
+        } break;
+        case Rectangle: {
+        } break;
+    }
+    int z = YET_ANOTHER_UNDECLARED;
+}
