@@ -1,0 +1,36 @@
+/*
+ * PHC Enforcement Demo — Error Case
+ *
+ * This file demonstrates phc rejecting non-exhaustive matching.
+ * Running: build/phc < examples/enforcement_error.phc
+ * Expected: phc exits with error, no output produced.
+ *
+ * The error: Shape has 3 variants but phc_match only handles 2.
+ * This is the "we thought it was X but it's Y" scenario that phc prevents.
+ */
+#include <stdio.h>
+
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; },
+    Triangle { double base; double height; }
+};
+
+int main(void) {
+    Shape s = Shape_mk_Triangle(3.0, 4.0);
+
+    /* BUG: Triangle is not handled!
+     * Without phc, this compiles fine and Triangle falls through silently.
+     * With phc, this is a transpile-time error. */
+    phc_match(Shape, s) {
+        case Circle: {
+            printf("circle r=%g\n", s.Circle.radius);
+        } break;
+        case Rectangle: {
+            printf("rect %gx%g\n", s.Rectangle.width, s.Rectangle.height);
+        } break;
+        /* Triangle missing → phc error */
+    }
+
+    return 0;
+}

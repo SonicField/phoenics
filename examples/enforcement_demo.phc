@@ -1,0 +1,111 @@
+/*
+ * PHC Enforcement Demo — Successful Case
+ *
+ * This program demonstrates compile-time enforcement via phc_match:
+ * - All variants of Result are handled → phc accepts
+ * - Tag is set correctly by constructors → runtime safety
+ * - Adding a new variant forces updating all phc_match sites
+ *
+ * Build: build/phc < examples/enforcement_demo.phc > /tmp/demo.c && \
+ *        clang -std=c11 -Wall -Werror -o /tmp/demo /tmp/demo.c && /tmp/demo
+ */
+#include <stdio.h>
+#include <assert.h>
+
+/* A Result type: either Ok with a value, or Err with an error message */
+phc_descr Result {
+    Ok { int value; },
+    Err { const char *message; }
+};
+
+/* A Maybe type: either Just with a value, or Nothing */
+phc_descr Maybe_int {
+    Just { int value; },
+    Nothing {}
+};
+
+/* Safe divide: returns Err on division by zero */
+Result safe_divide(int a, int b) {
+    if (b == 0) {
+        return Result_mk_Err("division by zero");
+    }
+    return Result_mk_Ok(a / b);
+}
+
+/* Look up value in a small array, return Nothing if out of bounds */
+Maybe_int lookup(int *arr, int len, int idx) {
+    if (idx < 0 || idx >= len) {
+        return Maybe_int_mk_Nothing();
+    }
+    return Maybe_int_mk_Just(arr[idx]);
+}
+
+int main(void) {
+    /* === Result enforcement === */
+    printf("=== Result type ===\n");
+
+    Result r1 = safe_divide(10, 3);
+    /* phc_match enforces that BOTH Ok and Err are handled.
+     * Remove either case → phc refuses to transpile. */
+    phc_match(Result, r1) {
+        case Ok: {
+            printf("10 / 3 = %d\n", r1.Ok.value);
+        } break;
+        case Err: {
+            printf("Error: %s\n", r1.Err.message);
+        } break;
+    }
+
+    Result r2 = safe_divide(10, 0);
+    phc_match(Result, r2) {
+        case Ok: {
+            printf("10 / 0 = %d\n", r2.Ok.value);
+        } break;
+        case Err: {
+            printf("Error: %s\n", r2.Err.message);
+        } break;
+    }
+
+    /* === Maybe enforcement === */
+    printf("\n=== Maybe type ===\n");
+
+    int data[] = {100, 200, 300};
+    Maybe_int m1 = lookup(data, 3, 1);
+    Maybe_int m2 = lookup(data, 3, 99);
+
+    phc_match(Maybe_int, m1) {
+        case Just: {
+            printf("Found: %d\n", m1.Just.value);
+        } break;
+        case Nothing: {
+            printf("Not found\n");
+        } break;
+    }
+
+    phc_match(Maybe_int, m2) {
+        case Just: {
+            printf("Found: %d\n", m2.Just.value);
+        } break;
+        case Nothing: {
+            printf("Not found\n");
+        } break;
+    }
+
+    /* === Tag propagation === */
+    printf("\n=== Tag safety ===\n");
+
+    /* Constructors guarantee correct tag — impossible to mismatch */
+    Result ok = Result_mk_Ok(42);
+    assert(ok.tag == Result_Ok);  /* always true */
+
+    Result err = Result_mk_Err("bad");
+    assert(err.tag == Result_Err);  /* always true */
+
+    /* Runtime tag range check using __COUNT sentinel */
+    assert(ok.tag < Result__COUNT);
+    assert(err.tag < Result__COUNT);
+
+    printf("All assertions passed — tags correctly propagated\n");
+
+    return 0;
+}

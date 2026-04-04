@@ -289,8 +289,9 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
     m.lbrace_pos = p->cur.pos;
     next_token(p);
 
-    /* Parse cases */
+    /* Parse cases (skip comments/other tokens between cases) */
     int case_cap = 0;
+    while (p->cur.type == TOK_OTHER) next_token(p);
     while (p->cur.type == TOK_CASE) {
         next_token(p); /* consume 'case' */
 
@@ -359,6 +360,7 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
         mc.body_text = strndup(p->source + body_start, body_end - body_start);
 
         DA_PUSH(m.cases, m.case_count, case_cap, mc);
+        while (p->cur.type == TOK_OTHER) next_token(p);
     }
 
     if (p->cur.type != TOK_RBRACE) {
