@@ -206,6 +206,57 @@ TEST(codegen_match_descr_preserves_body) {
     parse_result_free(&pr);
 }
 
+/* --- Safe accessor functions --- */
+
+TEST(codegen_safe_accessor_generated) {
+    const char *src = "phc_descr Shape { Circle { double radius; }, Rect { int w; } };";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    /* Should generate Shape_as_Circle accessor */
+    ASSERT(contains(out, "Shape_as_Circle"));
+    ASSERT(contains(out, "Shape_as_Rect"));
+    /* Accessor should assert the tag */
+    ASSERT(contains(out, "assert("));
+    ASSERT(contains(out, "Shape_Circle"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
+TEST(codegen_safe_accessor_empty_variant) {
+    const char *src = "phc_descr Option { Some { int value; }, None {} };";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    /* Even empty variants get accessors (for tag checking) */
+    ASSERT(contains(out, "Option_as_Some"));
+    ASSERT(contains(out, "Option_as_None"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
+TEST(codegen_safe_accessor_returns_pointer) {
+    const char *src = "phc_descr V { A { int x; int y; } };";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    /* Accessor macro asserts tag then accesses variant */
+    ASSERT(contains(out, "V_as_A"));
+    ASSERT(contains(out, "assert("));
+    ASSERT(contains(out, "(v).A"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
 TEST_MAIN(
     /* descr codegen */
     RUN_TEST(codegen_tag_enum);
@@ -221,4 +272,8 @@ TEST_MAIN(
     /* match_descr codegen */
     RUN_TEST(codegen_match_descr_generates_switch);
     RUN_TEST(codegen_match_descr_preserves_body);
+    /* safe accessor functions */
+    RUN_TEST(codegen_safe_accessor_generated);
+    RUN_TEST(codegen_safe_accessor_empty_variant);
+    RUN_TEST(codegen_safe_accessor_returns_pointer);
 )

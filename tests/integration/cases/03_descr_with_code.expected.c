@@ -27,6 +27,15 @@ static inline Option_int Option_int_mk_None(void) {
     return _v;
 }
 
+#define Option_int_as_Some(v) \
+    (assert((v).tag == Option_int_Some && "Option_int: expected Some"), \
+     (v).Some)
+
+#define Option_int_as_None(v) \
+    (assert((v).tag == Option_int_None && "Option_int: expected None"), \
+     (v).None)
+
+
 int main(void) {
     Option_int x = Option_int_mk_Some(42);
     switch (x.tag) {

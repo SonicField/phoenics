@@ -29,6 +29,15 @@ static inline Result Result_mk_Err(int code, const char *message) {
     return _v;
 }
 
+#define Result_as_Ok(v) \
+    (assert((v).tag == Result_Ok && "Result: expected Ok"), \
+     (v).Ok)
+
+#define Result_as_Err(v) \
+    (assert((v).tag == Result_Err && "Result: expected Err"), \
+     (v).Err)
+
+
 int main(void) {
     Result r = Result_mk_Ok(42);
     switch (r.tag) {

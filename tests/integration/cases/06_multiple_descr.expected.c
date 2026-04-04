@@ -34,6 +34,19 @@ static inline Color Color_mk_Blue(void) {
     return _v;
 }
 
+#define Color_as_Red(v) \
+    (assert((v).tag == Color_Red && "Color: expected Red"), \
+     (v).Red)
+
+#define Color_as_Green(v) \
+    (assert((v).tag == Color_Green && "Color: expected Green"), \
+     (v).Green)
+
+#define Color_as_Blue(v) \
+    (assert((v).tag == Color_Blue && "Color: expected Blue"), \
+     (v).Blue)
+
+
 typedef enum {
     Value_Integer,
     Value_Float,
@@ -70,6 +83,19 @@ static inline Value Value_mk_String(const char *s) {
     _v.String.s = s;
     return _v;
 }
+
+#define Value_as_Integer(v) \
+    (assert((v).tag == Value_Integer && "Value: expected Integer"), \
+     (v).Integer)
+
+#define Value_as_Float(v) \
+    (assert((v).tag == Value_Float && "Value: expected Float"), \
+     (v).Float)
+
+#define Value_as_String(v) \
+    (assert((v).tag == Value_String && "Value: expected String"), \
+     (v).String)
+
 
 int main(void) {
     Color c = Color_mk_Red();

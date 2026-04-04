@@ -36,3 +36,16 @@ static inline Shape Shape_mk_Triangle(double base, double height) {
     _v.Triangle.height = height;
     return _v;
 }
+
+#define Shape_as_Circle(v) \
+    (assert((v).tag == Shape_Circle && "Shape: expected Circle"), \
+     (v).Circle)
+
+#define Shape_as_Rectangle(v) \
+    (assert((v).tag == Shape_Rectangle && "Shape: expected Rectangle"), \
+     (v).Rectangle)
+
+#define Shape_as_Triangle(v) \
+    (assert((v).tag == Shape_Triangle && "Shape: expected Triangle"), \
+     (v).Triangle)
+

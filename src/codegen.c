@@ -75,6 +75,17 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
             buf_append(buf, "\n");
         }
     }
+
+    /* Safe accessor macros — assert tag before accessing variant fields */
+    buf_append(buf, "\n");
+    for (int i = 0; i < d->variant_count; i++) {
+        const Variant *v = &d->variants[i];
+        buf_append(buf, "\n");
+        buf_printf(buf, "#define %s_as_%s(v) \\\n", d->name, v->name);
+        buf_printf(buf, "    (assert((v).tag == %s_%s && \"%s: expected %s\"), \\\n",
+                   d->name, v->name, d->name, v->name);
+        buf_printf(buf, "     (v).%s)\n", v->name);
+    }
 }
 
 /* --- match_descr codegen --- */

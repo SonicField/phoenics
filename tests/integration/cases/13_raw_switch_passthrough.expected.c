@@ -34,6 +34,19 @@ static inline Color Color_mk_Blue(void) {
     return _v;
 }
 
+#define Color_as_Red(v) \
+    (assert((v).tag == Color_Red && "Color: expected Red"), \
+     (v).Red)
+
+#define Color_as_Green(v) \
+    (assert((v).tag == Color_Green && "Color: expected Green"), \
+     (v).Green)
+
+#define Color_as_Blue(v) \
+    (assert((v).tag == Color_Blue && "Color: expected Blue"), \
+     (v).Blue)
+
+
 /* Raw switch on phc_descr tag — NOT phc_match.
  * PHC must NOT enforce exhaustiveness here.
  * The switch passes through unchanged. */

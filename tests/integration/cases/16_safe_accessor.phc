@@ -1,0 +1,21 @@
+#include <stdio.h>
+#include <assert.h>
+
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+
+int main(void) {
+    Shape s = Shape_mk_Circle(3.14);
+
+    /* Safe accessor macro — asserts tag is correct, returns variant struct */
+    double r = Shape_as_Circle(s).radius;
+    printf("radius: %g\n", r);
+
+    Shape rect = Shape_mk_Rectangle(10.0, 5.0);
+    double area = Shape_as_Rectangle(rect).width * Shape_as_Rectangle(rect).height;
+    printf("area: %g\n", area);
+
+    return 0;
+}

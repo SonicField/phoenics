@@ -1,0 +1,21 @@
+#include <stdio.h>
+
+phc_descr Val {
+    Int { int n; },
+    Str { const char *s; }
+};
+
+int main(void) {
+    Val v = Val_mk_Int(99);
+    phc_match(Val, v) {
+        /* Handle integer values */
+        case Int: {
+            printf("int: %d\n", v.Int.n);
+        } break;
+        // Handle string values
+        case Str: {
+            printf("str: %s\n", v.Str.s);
+        } break;
+    }
+    return 0;
+}

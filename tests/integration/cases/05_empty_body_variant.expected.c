@@ -24,3 +24,12 @@ static inline Maybe_int Maybe_int_mk_Nothing(void) {
     _v.tag = Maybe_int_Nothing;
     return _v;
 }
+
+#define Maybe_int_as_Just(v) \
+    (assert((v).tag == Maybe_int_Just && "Maybe_int: expected Just"), \
+     (v).Just)
+
+#define Maybe_int_as_Nothing(v) \
+    (assert((v).tag == Maybe_int_Nothing && "Maybe_int: expected Nothing"), \
+     (v).Nothing)
+

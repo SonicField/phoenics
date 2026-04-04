@@ -29,6 +29,15 @@ static inline Shape Shape_mk_Rectangle(double width, double height) {
     return _v;
 }
 
+#define Shape_as_Circle(v) \
+    (assert((v).tag == Shape_Circle && "Shape: expected Circle"), \
+     (v).Circle)
+
+#define Shape_as_Rectangle(v) \
+    (assert((v).tag == Shape_Rectangle && "Shape: expected Rectangle"), \
+     (v).Rectangle)
+
+
 int main(void) {
     Shape s = Shape_mk_Circle(3.14);
     switch (s.tag) {
