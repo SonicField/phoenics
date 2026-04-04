@@ -1,4 +1,4 @@
-#include <stdlib.h>
+extern void abort(void);
 #include <stdio.h>
 
 /* Test: phc works correctly after cc -E (preprocessor).

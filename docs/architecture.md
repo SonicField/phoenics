@@ -42,7 +42,7 @@ phc_descr <TypeName> {
 **Generated C11 output for `phc_descr Shape { Circle { double radius; }, Rectangle { double width; double height; } };`:**
 
 ```c
-#include <stdlib.h>
+extern void abort(void);
 typedef enum {
     Shape_Circle,
     Shape_Rectangle,
@@ -102,7 +102,7 @@ static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
 | Named variant typedefs (`Shape_Circle_t`) | Enables typed accessor functions. Each variant struct gets its own typedef. |
 | Anonymous union | C11 feature. Allows `v.Circle.radius` instead of `v.u.Circle.radius`. |
 | `static inline` constructors | Works across translation units without linker issues. Compiler optimises away the function call. |
-| `static inline` safe accessors | `Shape_as_Circle(v)` returns the variant struct by value. Calls `abort()` from `<stdlib.h>` if tag is wrong. C11 portable — no compiler-specific builtins. |
+| `static inline` safe accessors | `Shape_as_Circle(v)` returns the variant struct by value. Calls `abort()` if tag is wrong — declared via `extern void abort(void);` to avoid double-inclusion in post-preprocessor mode. C11 portable. |
 | `_v` local name | Unlikely to collide. Prefixed underscore + lowercase is reserved in file scope but legal in block scope. |
 | Empty variants get `struct { char _empty; }` | C forbids zero-size structs. The `_empty` field occupies 1 byte and is never accessed. |
 

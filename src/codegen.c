@@ -168,9 +168,11 @@ char *codegen(const Program *prog) {
     Buffer buf;
     buf_init(&buf);
 
-    /* Emit #include <stdlib.h> for abort() in safe accessor functions */
+    /* Declare abort() for safe accessor functions. Use a direct declaration
+     * instead of #include <stdlib.h> to avoid double-inclusion when phc runs
+     * post-preprocessor (cc -E | phc | cc — stdlib.h is already expanded). */
     if (prog->descr_count > 0) {
-        buf_append(&buf, "#include <stdlib.h>\n");
+        buf_append(&buf, "extern void abort(void);\n");
     }
 
     for (int i = 0; i < prog->chunk_count; i++) {

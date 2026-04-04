@@ -1,4 +1,4 @@
-#include <stdlib.h>
+extern void abort(void);
 typedef enum {
     Maybe_int_Just,
     Maybe_int_Nothing,

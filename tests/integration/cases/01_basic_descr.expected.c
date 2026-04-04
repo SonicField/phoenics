@@ -1,4 +1,4 @@
-#include <stdlib.h>
+extern void abort(void);
 typedef enum {
     Shape_Circle,
     Shape_Rectangle,
