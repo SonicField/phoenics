@@ -16,7 +16,9 @@ typedef struct {
     int descr_type_count;
 } SemanticResult;
 
-SemanticResult analyse(const Program *program);
+SemanticResult analyse(const Program *program,
+                       const DescrType *external_types,
+                       int external_type_count);
 void semantic_result_free(SemanticResult *result);
 
 #endif /* PHC_SEMANTIC_H */
