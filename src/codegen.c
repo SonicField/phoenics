@@ -86,7 +86,7 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         buf_append(buf, "\n\n");
         buf_printf(buf, "static inline %s_%s_t %s_as_%s(%s v) {\n",
                    d->name, v->name, d->name, v->name, d->name);
-        buf_printf(buf, "    if (v.tag != %s_%s) __builtin_trap();\n",
+        buf_printf(buf, "    if (v.tag != %s_%s) abort();\n",
                    d->name, v->name);
         buf_printf(buf, "    return v.%s;\n", v->name);
         buf_append(buf, "}");
@@ -167,6 +167,11 @@ static void emit_match_descr(Buffer *buf, const Program *prog,
 char *codegen(const Program *prog) {
     Buffer buf;
     buf_init(&buf);
+
+    /* Emit #include <stdlib.h> for abort() in safe accessor functions */
+    if (prog->descr_count > 0) {
+        buf_append(&buf, "#include <stdlib.h>\n");
+    }
 
     for (int i = 0; i < prog->chunk_count; i++) {
         const Chunk *c = &prog->chunks[i];

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 
 typedef enum {
@@ -36,12 +37,12 @@ static inline Option_int Option_int_mk_None(void) {
 }
 
 static inline Option_int_Some_t Option_int_as_Some(Option_int v) {
-    if (v.tag != Option_int_Some) __builtin_trap();
+    if (v.tag != Option_int_Some) abort();
     return v.Some;
 }
 
 static inline Option_int_None_t Option_int_as_None(Option_int v) {
-    if (v.tag != Option_int_None) __builtin_trap();
+    if (v.tag != Option_int_None) abort();
     return v.None;
 }
 

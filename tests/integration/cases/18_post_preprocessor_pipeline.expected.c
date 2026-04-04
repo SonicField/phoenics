@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 
 /* Test: phc works correctly after cc -E (preprocessor).
@@ -40,12 +41,12 @@ static inline Result Result_mk_Err(const char *msg) {
 }
 
 static inline Result_Ok_t Result_as_Ok(Result v) {
-    if (v.tag != Result_Ok) __builtin_trap();
+    if (v.tag != Result_Ok) abort();
     return v.Ok;
 }
 
 static inline Result_Err_t Result_as_Err(Result v) {
-    if (v.tag != Result_Err) __builtin_trap();
+    if (v.tag != Result_Err) abort();
     return v.Err;
 }
 

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 
 typedef enum {
@@ -37,12 +38,12 @@ static inline X X_mk_B(int w) {
 }
 
 static inline X_A_t X_as_A(X v) {
-    if (v.tag != X_A) __builtin_trap();
+    if (v.tag != X_A) abort();
     return v.A;
 }
 
 static inline X_B_t X_as_B(X v) {
-    if (v.tag != X_B) __builtin_trap();
+    if (v.tag != X_B) abort();
     return v.B;
 }
 

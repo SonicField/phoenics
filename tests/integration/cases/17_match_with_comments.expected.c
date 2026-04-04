@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 
 typedef enum {
@@ -37,12 +38,12 @@ static inline Val Val_mk_Str(const char *s) {
 }
 
 static inline Val_Int_t Val_as_Int(Val v) {
-    if (v.tag != Val_Int) __builtin_trap();
+    if (v.tag != Val_Int) abort();
     return v.Int;
 }
 
 static inline Val_Str_t Val_as_Str(Val v) {
-    if (v.tag != Val_Str) __builtin_trap();
+    if (v.tag != Val_Str) abort();
     return v.Str;
 }
 

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 typedef enum {
     Maybe_int_Just,
     Maybe_int_Nothing,
@@ -34,11 +35,11 @@ static inline Maybe_int Maybe_int_mk_Nothing(void) {
 }
 
 static inline Maybe_int_Just_t Maybe_int_as_Just(Maybe_int v) {
-    if (v.tag != Maybe_int_Just) __builtin_trap();
+    if (v.tag != Maybe_int_Just) abort();
     return v.Just;
 }
 
 static inline Maybe_int_Nothing_t Maybe_int_as_Nothing(Maybe_int v) {
-    if (v.tag != Maybe_int_Nothing) __builtin_trap();
+    if (v.tag != Maybe_int_Nothing) abort();
     return v.Nothing;
 }

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -40,12 +41,12 @@ static inline Shape Shape_mk_Rectangle(double width, double height) {
 }
 
 static inline Shape_Circle_t Shape_as_Circle(Shape v) {
-    if (v.tag != Shape_Circle) __builtin_trap();
+    if (v.tag != Shape_Circle) abort();
     return v.Circle;
 }
 
 static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
-    if (v.tag != Shape_Rectangle) __builtin_trap();
+    if (v.tag != Shape_Rectangle) abort();
     return v.Rectangle;
 }
 
