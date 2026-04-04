@@ -106,8 +106,7 @@ static int load_type_manifest(const char *path,
     free(line);
     fclose(f);
     if (*count == initial_count) {
-        fprintf(stderr, "phc: error: no types found in manifest '%s'\n", path);
-        return 0;
+        fprintf(stderr, "phc: warning: no types found in manifest '%s'\n", path);
     }
     return 1;
 }
