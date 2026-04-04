@@ -13,7 +13,7 @@ LIB_OBJS = $(filter-out $(BUILDDIR)/main.o,$(OBJS))
 UNIT_SRCS = $(wildcard $(TESTDIR)/unit/*.c)
 UNIT_BINS = $(patsubst $(TESTDIR)/unit/%.c,$(BUILDDIR)/test_%,$(UNIT_SRCS))
 
-.PHONY: all clean test test-unit test-integration test-selfhost test-roundtrip
+.PHONY: all clean test test-unit test-integration test-selfhost test-pipeline test-roundtrip
 
 all: $(BUILDDIR)/phc
 
@@ -30,7 +30,7 @@ $(BUILDDIR)/phc: $(OBJS) | $(BUILDDIR)
 $(BUILDDIR)/test_%: $(TESTDIR)/unit/%.c $(LIB_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR) $< $(LIB_OBJS) -o $@
 
-test: test-unit test-integration test-selfhost
+test: test-unit test-integration test-selfhost test-pipeline
 
 test-unit: $(UNIT_BINS)
 	@echo "=== Unit Tests ==="
@@ -50,6 +50,11 @@ test-integration: $(BUILDDIR)/phc
 test-selfhost: $(BUILDDIR)/phc
 	@echo "=== Self-Hosting Round-Trip Test ==="
 	@$(TESTDIR)/integration/roundtrip_test.sh $(BUILDDIR)/phc $(SRCDIR)
+
+# Post-preprocessor pipeline test: cc -E | phc | cc
+test-pipeline: $(BUILDDIR)/phc
+	@echo "=== Post-Preprocessor Pipeline Test ==="
+	@$(TESTDIR)/integration/pipeline_test.sh $(BUILDDIR)/phc $(TESTDIR)/integration/cases
 
 # Passthrough round-trip test against real C files
 # Usage: make test-roundtrip ROUNDTRIP_DIR=tests/scale/
