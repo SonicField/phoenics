@@ -10,14 +10,13 @@ build/
 
 # NBS transient files
 .nbs/pids/
-.nbs/events/
+.nbs/events/processed/
+.nbs/events/.dedup.lock
 .nbs/logs/
 .nbs/chat/*.lock
 .nbs/chat/*.cursors
 .nbs/sessions/
 .nbs/nbs-claude-*.log
-.nbs/fixup-last-run
-.nbs/librarian-last-run
-.nbs/pythia-last-run
-.nbs/shepard-last-run
+.nbs/*-last-run
 .nbs/control-registry-*
+.nbs/*.lock
