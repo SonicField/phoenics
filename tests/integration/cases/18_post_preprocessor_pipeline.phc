@@ -1,0 +1,25 @@
+#include <stdio.h>
+
+/* Test: phc works correctly after cc -E (preprocessor).
+ * Pipeline: clang -x c -E -P input.phc | build/phc | clang -x c - -o output */
+
+phc_descr Result {
+    Ok { int value; },
+    Err { const char *msg; }
+};
+
+int main(void) {
+    Result r = Result_mk_Ok(42);
+
+    /* Test accessor function (not macro) */
+    Result_Ok_t ok = Result_as_Ok(r);
+    printf("ok: %d\n", ok.value);
+
+    /* Test exhaustive match */
+    phc_match(Result, r) {
+        case Ok: { printf("match ok: %d\n", r.Ok.value); } break;
+        case Err: { printf("match err: %s\n", r.Err.msg); } break;
+    }
+
+    return 0;
+}

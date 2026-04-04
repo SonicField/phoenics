@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -38,12 +37,12 @@ static inline X X_mk_B(int w) {
 }
 
 static inline X_A_t X_as_A(X v) {
-    assert(v.tag == X_A && "X: expected A");
+    if (v.tag != X_A) __builtin_trap();
     return v.A;
 }
 
 static inline X_B_t X_as_B(X v) {
-    assert(v.tag == X_B && "X: expected B");
+    if (v.tag != X_B) __builtin_trap();
     return v.B;
 }
 

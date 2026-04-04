@@ -218,8 +218,8 @@ TEST(codegen_safe_accessor_generated) {
     /* Should generate Shape_as_Circle accessor */
     ASSERT(contains(out, "Shape_as_Circle"));
     ASSERT(contains(out, "Shape_as_Rect"));
-    /* Accessor should assert the tag */
-    ASSERT(contains(out, "assert("));
+    /* Accessor should check the tag */
+    ASSERT(contains(out, "__builtin_trap()"));
     ASSERT(contains(out, "Shape_Circle"));
 
     free(out);
@@ -248,9 +248,9 @@ TEST(codegen_safe_accessor_returns_pointer) {
 
     char *out = codegen(&pr.program);
     ASSERT_NOT_NULL(out);
-    /* Accessor function asserts tag then returns variant struct */
+    /* Accessor function checks tag then returns variant struct */
     ASSERT(contains(out, "V_A_t V_as_A("));
-    ASSERT(contains(out, "assert("));
+    ASSERT(contains(out, "__builtin_trap()"));
     ASSERT(contains(out, "return v.A;"));
 
     free(out);

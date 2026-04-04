@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -48,17 +47,17 @@ static inline Color Color_mk_Blue(void) {
 }
 
 static inline Color_Red_t Color_as_Red(Color v) {
-    assert(v.tag == Color_Red && "Color: expected Red");
+    if (v.tag != Color_Red) __builtin_trap();
     return v.Red;
 }
 
 static inline Color_Green_t Color_as_Green(Color v) {
-    assert(v.tag == Color_Green && "Color: expected Green");
+    if (v.tag != Color_Green) __builtin_trap();
     return v.Green;
 }
 
 static inline Color_Blue_t Color_as_Blue(Color v) {
-    assert(v.tag == Color_Blue && "Color: expected Blue");
+    if (v.tag != Color_Blue) __builtin_trap();
     return v.Blue;
 }
 
@@ -112,17 +111,17 @@ static inline Value Value_mk_String(const char *s) {
 }
 
 static inline Value_Integer_t Value_as_Integer(Value v) {
-    assert(v.tag == Value_Integer && "Value: expected Integer");
+    if (v.tag != Value_Integer) __builtin_trap();
     return v.Integer;
 }
 
 static inline Value_Float_t Value_as_Float(Value v) {
-    assert(v.tag == Value_Float && "Value: expected Float");
+    if (v.tag != Value_Float) __builtin_trap();
     return v.Float;
 }
 
 static inline Value_String_t Value_as_String(Value v) {
-    assert(v.tag == Value_String && "Value: expected String");
+    if (v.tag != Value_String) __builtin_trap();
     return v.String;
 }
 

@@ -1,4 +1,3 @@
-#include <assert.h>
 typedef enum {
     Wrapper_Value,
     Wrapper__COUNT
@@ -23,6 +22,6 @@ static inline Wrapper Wrapper_mk_Value(int x) {
 }
 
 static inline Wrapper_Value_t Wrapper_as_Value(Wrapper v) {
-    assert(v.tag == Wrapper_Value && "Wrapper: expected Value");
+    if (v.tag != Wrapper_Value) __builtin_trap();
     return v.Value;
 }

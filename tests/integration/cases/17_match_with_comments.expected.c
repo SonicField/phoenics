@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -38,12 +37,12 @@ static inline Val Val_mk_Str(const char *s) {
 }
 
 static inline Val_Int_t Val_as_Int(Val v) {
-    assert(v.tag == Val_Int && "Val: expected Int");
+    if (v.tag != Val_Int) __builtin_trap();
     return v.Int;
 }
 
 static inline Val_Str_t Val_as_Str(Val v) {
-    assert(v.tag == Val_Str && "Val: expected Str");
+    if (v.tag != Val_Str) __builtin_trap();
     return v.Str;
 }
 

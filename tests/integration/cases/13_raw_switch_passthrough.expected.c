@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -48,17 +47,17 @@ static inline Color Color_mk_Blue(void) {
 }
 
 static inline Color_Red_t Color_as_Red(Color v) {
-    assert(v.tag == Color_Red && "Color: expected Red");
+    if (v.tag != Color_Red) __builtin_trap();
     return v.Red;
 }
 
 static inline Color_Green_t Color_as_Green(Color v) {
-    assert(v.tag == Color_Green && "Color: expected Green");
+    if (v.tag != Color_Green) __builtin_trap();
     return v.Green;
 }
 
 static inline Color_Blue_t Color_as_Blue(Color v) {
-    assert(v.tag == Color_Blue && "Color: expected Blue");
+    if (v.tag != Color_Blue) __builtin_trap();
     return v.Blue;
 }
 

@@ -1,4 +1,3 @@
-#include <assert.h>
 typedef enum {
     Shape_Circle,
     Shape_Rectangle,
@@ -53,16 +52,16 @@ static inline Shape Shape_mk_Triangle(double base, double height) {
 }
 
 static inline Shape_Circle_t Shape_as_Circle(Shape v) {
-    assert(v.tag == Shape_Circle && "Shape: expected Circle");
+    if (v.tag != Shape_Circle) __builtin_trap();
     return v.Circle;
 }
 
 static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
-    assert(v.tag == Shape_Rectangle && "Shape: expected Rectangle");
+    if (v.tag != Shape_Rectangle) __builtin_trap();
     return v.Rectangle;
 }
 
 static inline Shape_Triangle_t Shape_as_Triangle(Shape v) {
-    assert(v.tag == Shape_Triangle && "Shape: expected Triangle");
+    if (v.tag != Shape_Triangle) __builtin_trap();
     return v.Triangle;
 }

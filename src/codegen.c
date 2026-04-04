@@ -86,8 +86,8 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         buf_append(buf, "\n\n");
         buf_printf(buf, "static inline %s_%s_t %s_as_%s(%s v) {\n",
                    d->name, v->name, d->name, v->name, d->name);
-        buf_printf(buf, "    assert(v.tag == %s_%s && \"%s: expected %s\");\n",
-                   d->name, v->name, d->name, v->name);
+        buf_printf(buf, "    if (v.tag != %s_%s) __builtin_trap();\n",
+                   d->name, v->name);
         buf_printf(buf, "    return v.%s;\n", v->name);
         buf_append(buf, "}");
     }
@@ -167,12 +167,6 @@ static void emit_match_descr(Buffer *buf, const Program *prog,
 char *codegen(const Program *prog) {
     Buffer buf;
     buf_init(&buf);
-
-    /* Emit #include <assert.h> at the top if any descr declarations exist
-     * (safe accessor functions use assert) */
-    if (prog->descr_count > 0) {
-        buf_append(&buf, "#include <assert.h>\n");
-    }
 
     for (int i = 0; i < prog->chunk_count; i++) {
         const Chunk *c = &prog->chunks[i];

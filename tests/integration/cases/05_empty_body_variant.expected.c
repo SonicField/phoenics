@@ -1,4 +1,3 @@
-#include <assert.h>
 typedef enum {
     Maybe_int_Just,
     Maybe_int_Nothing,
@@ -35,11 +34,11 @@ static inline Maybe_int Maybe_int_mk_Nothing(void) {
 }
 
 static inline Maybe_int_Just_t Maybe_int_as_Just(Maybe_int v) {
-    assert(v.tag == Maybe_int_Just && "Maybe_int: expected Just");
+    if (v.tag != Maybe_int_Just) __builtin_trap();
     return v.Just;
 }
 
 static inline Maybe_int_Nothing_t Maybe_int_as_Nothing(Maybe_int v) {
-    assert(v.tag == Maybe_int_Nothing && "Maybe_int: expected Nothing");
+    if (v.tag != Maybe_int_Nothing) __builtin_trap();
     return v.Nothing;
 }

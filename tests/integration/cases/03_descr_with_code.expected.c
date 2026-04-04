@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -37,12 +36,12 @@ static inline Option_int Option_int_mk_None(void) {
 }
 
 static inline Option_int_Some_t Option_int_as_Some(Option_int v) {
-    assert(v.tag == Option_int_Some && "Option_int: expected Some");
+    if (v.tag != Option_int_Some) __builtin_trap();
     return v.Some;
 }
 
 static inline Option_int_None_t Option_int_as_None(Option_int v) {
-    assert(v.tag == Option_int_None && "Option_int: expected None");
+    if (v.tag != Option_int_None) __builtin_trap();
     return v.None;
 }
 
