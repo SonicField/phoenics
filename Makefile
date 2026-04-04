@@ -30,7 +30,7 @@ $(BUILDDIR)/phc: $(OBJS) | $(BUILDDIR)
 $(BUILDDIR)/test_%: $(TESTDIR)/unit/%.c $(LIB_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR) $< $(LIB_OBJS) -o $@
 
-test: test-unit test-integration test-fidelity test-selfhost test-pipeline
+test: test-unit test-integration test-fidelity test-selfhost test-pipeline test-multifile test-line
 
 test-unit: $(UNIT_BINS)
 	@echo "=== Unit Tests ==="
