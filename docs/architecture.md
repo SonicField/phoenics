@@ -42,18 +42,26 @@ phc_descr <TypeName> {
 **Generated C11 output for `phc_descr Shape { Circle { double radius; }, Rectangle { double width; double height; } };`:**
 
 ```c
-/* --- phc_descr Shape --- */
 typedef enum {
     Shape_Circle,
     Shape_Rectangle,
-    Shape__COUNT   /* variant count for validation */
+    Shape__COUNT
 } Shape_Tag;
+
+typedef struct {
+    double radius;
+} Shape_Circle_t;
+
+typedef struct {
+    double width;
+    double height;
+} Shape_Rectangle_t;
 
 typedef struct {
     Shape_Tag tag;
     union {
-        struct { double radius; } Circle;
-        struct { double width; double height; } Rectangle;
+        Shape_Circle_t Circle;
+        Shape_Rectangle_t Rectangle;
     };
 } Shape;
 
@@ -71,6 +79,16 @@ static inline Shape Shape_mk_Rectangle(double width, double height) {
     _v.Rectangle.height = height;
     return _v;
 }
+
+static inline Shape_Circle_t Shape_as_Circle(Shape v) {
+    if (v.tag != Shape_Circle) __builtin_trap();
+    return v.Circle;
+}
+
+static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
+    if (v.tag != Shape_Rectangle) __builtin_trap();
+    return v.Rectangle;
+}
 ```
 
 **Design choices:**
@@ -80,8 +98,10 @@ static inline Shape Shape_mk_Rectangle(double width, double height) {
 | `Shape_Tag` enum name | Avoids collision with the struct name. Consistent naming: `<Type>_Tag`. |
 | `Shape_Circle` enum values | `<Type>_<Variant>` is unambiguous, grep-friendly, AI-readable. |
 | `Shape__COUNT` sentinel | Enables runtime tag validation (`assert(v.tag < Shape__COUNT)`). Double underscore signals "not a real variant." |
+| Named variant typedefs (`Shape_Circle_t`) | Enables typed accessor functions. Each variant struct gets its own typedef. |
 | Anonymous union | C11 feature. Allows `v.Circle.radius` instead of `v.u.Circle.radius`. |
 | `static inline` constructors | Works across translation units without linker issues. Compiler optimises away the function call. |
+| `static inline` safe accessors | `Shape_as_Circle(v)` returns the variant struct by value. Traps via `__builtin_trap()` if tag is wrong. Works after preprocessing (no `assert.h` dependency). |
 | `_v` local name | Unlikely to collide. Prefixed underscore + lowercase is reserved in file scope but legal in block scope. |
 | Empty variants get `struct { char _empty; }` | C forbids zero-size structs. The `_empty` field occupies 1 byte and is never accessed. |
 
