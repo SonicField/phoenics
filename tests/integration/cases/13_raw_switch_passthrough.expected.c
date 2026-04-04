@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -8,11 +9,23 @@ typedef enum {
 } Color_Tag;
 
 typedef struct {
+    char _empty;
+} Color_Red_t;
+
+typedef struct {
+    char _empty;
+} Color_Green_t;
+
+typedef struct {
+    char _empty;
+} Color_Blue_t;
+
+typedef struct {
     Color_Tag tag;
     union {
-        struct { char _empty; } Red;
-        struct { char _empty; } Green;
-        struct { char _empty; } Blue;
+        Color_Red_t Red;
+        Color_Green_t Green;
+        Color_Blue_t Blue;
     };
 } Color;
 
@@ -34,18 +47,20 @@ static inline Color Color_mk_Blue(void) {
     return _v;
 }
 
-#define Color_as_Red(v) \
-    (assert((v).tag == Color_Red && "Color: expected Red"), \
-     (v).Red)
+static inline Color_Red_t Color_as_Red(Color v) {
+    assert(v.tag == Color_Red && "Color: expected Red");
+    return v.Red;
+}
 
-#define Color_as_Green(v) \
-    (assert((v).tag == Color_Green && "Color: expected Green"), \
-     (v).Green)
+static inline Color_Green_t Color_as_Green(Color v) {
+    assert(v.tag == Color_Green && "Color: expected Green");
+    return v.Green;
+}
 
-#define Color_as_Blue(v) \
-    (assert((v).tag == Color_Blue && "Color: expected Blue"), \
-     (v).Blue)
-
+static inline Color_Blue_t Color_as_Blue(Color v) {
+    assert(v.tag == Color_Blue && "Color: expected Blue");
+    return v.Blue;
+}
 
 /* Raw switch on phc_descr tag — NOT phc_match.
  * PHC must NOT enforce exhaustiveness here.

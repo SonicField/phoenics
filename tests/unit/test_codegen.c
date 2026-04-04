@@ -34,7 +34,7 @@ TEST(codegen_struct_with_union) {
     ASSERT(contains(out, "typedef struct {"));
     ASSERT(contains(out, "Shape_Tag tag;"));
     ASSERT(contains(out, "union {"));
-    ASSERT(contains(out, "struct { double radius; } Circle;"));
+    ASSERT(contains(out, "Shape_Circle_t Circle;"));
     ASSERT(contains(out, "} Shape;"));
 
     free(out);
@@ -65,7 +65,7 @@ TEST(codegen_empty_variant_constructor) {
     char *out = codegen(&pr.program);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "static inline Option Option_mk_None(void)"));
-    ASSERT(contains(out, "struct { char _empty; } None;"));
+    ASSERT(contains(out, "Option_None_t None;"));
 
     free(out);
     parse_result_free(&pr);
@@ -248,10 +248,10 @@ TEST(codegen_safe_accessor_returns_pointer) {
 
     char *out = codegen(&pr.program);
     ASSERT_NOT_NULL(out);
-    /* Accessor macro asserts tag then accesses variant */
-    ASSERT(contains(out, "V_as_A"));
+    /* Accessor function asserts tag then returns variant struct */
+    ASSERT(contains(out, "V_A_t V_as_A("));
     ASSERT(contains(out, "assert("));
-    ASSERT(contains(out, "(v).A"));
+    ASSERT(contains(out, "return v.A;"));
 
     free(out);
     parse_result_free(&pr);

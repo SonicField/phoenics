@@ -1,3 +1,4 @@
+#include <assert.h>
 typedef enum {
     Shape_Circle,
     Shape_Rectangle,
@@ -6,11 +7,25 @@ typedef enum {
 } Shape_Tag;
 
 typedef struct {
+    double radius;
+} Shape_Circle_t;
+
+typedef struct {
+    double width;
+    double height;
+} Shape_Rectangle_t;
+
+typedef struct {
+    double base;
+    double height;
+} Shape_Triangle_t;
+
+typedef struct {
     Shape_Tag tag;
     union {
-        struct { double radius; } Circle;
-        struct { double width; double height; } Rectangle;
-        struct { double base; double height; } Triangle;
+        Shape_Circle_t Circle;
+        Shape_Rectangle_t Rectangle;
+        Shape_Triangle_t Triangle;
     };
 } Shape;
 
@@ -37,15 +52,17 @@ static inline Shape Shape_mk_Triangle(double base, double height) {
     return _v;
 }
 
-#define Shape_as_Circle(v) \
-    (assert((v).tag == Shape_Circle && "Shape: expected Circle"), \
-     (v).Circle)
+static inline Shape_Circle_t Shape_as_Circle(Shape v) {
+    assert(v.tag == Shape_Circle && "Shape: expected Circle");
+    return v.Circle;
+}
 
-#define Shape_as_Rectangle(v) \
-    (assert((v).tag == Shape_Rectangle && "Shape: expected Rectangle"), \
-     (v).Rectangle)
+static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
+    assert(v.tag == Shape_Rectangle && "Shape: expected Rectangle");
+    return v.Rectangle;
+}
 
-#define Shape_as_Triangle(v) \
-    (assert((v).tag == Shape_Triangle && "Shape: expected Triangle"), \
-     (v).Triangle)
-
+static inline Shape_Triangle_t Shape_as_Triangle(Shape v) {
+    assert(v.tag == Shape_Triangle && "Shape: expected Triangle");
+    return v.Triangle;
+}

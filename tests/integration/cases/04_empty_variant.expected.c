@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -7,10 +8,19 @@ typedef enum {
 } Result_Tag;
 
 typedef struct {
+    int value;
+} Result_Ok_t;
+
+typedef struct {
+    int code;
+    const char *message;
+} Result_Err_t;
+
+typedef struct {
     Result_Tag tag;
     union {
-        struct { int value; } Ok;
-        struct { int code; const char *message; } Err;
+        Result_Ok_t Ok;
+        Result_Err_t Err;
     };
 } Result;
 
@@ -29,14 +39,15 @@ static inline Result Result_mk_Err(int code, const char *message) {
     return _v;
 }
 
-#define Result_as_Ok(v) \
-    (assert((v).tag == Result_Ok && "Result: expected Ok"), \
-     (v).Ok)
+static inline Result_Ok_t Result_as_Ok(Result v) {
+    assert(v.tag == Result_Ok && "Result: expected Ok");
+    return v.Ok;
+}
 
-#define Result_as_Err(v) \
-    (assert((v).tag == Result_Err && "Result: expected Err"), \
-     (v).Err)
-
+static inline Result_Err_t Result_as_Err(Result v) {
+    assert(v.tag == Result_Err && "Result: expected Err");
+    return v.Err;
+}
 
 int main(void) {
     Result r = Result_mk_Ok(42);

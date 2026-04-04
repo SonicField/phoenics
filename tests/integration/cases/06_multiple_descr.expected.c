@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -8,11 +9,23 @@ typedef enum {
 } Color_Tag;
 
 typedef struct {
+    char _empty;
+} Color_Red_t;
+
+typedef struct {
+    char _empty;
+} Color_Green_t;
+
+typedef struct {
+    char _empty;
+} Color_Blue_t;
+
+typedef struct {
     Color_Tag tag;
     union {
-        struct { char _empty; } Red;
-        struct { char _empty; } Green;
-        struct { char _empty; } Blue;
+        Color_Red_t Red;
+        Color_Green_t Green;
+        Color_Blue_t Blue;
     };
 } Color;
 
@@ -34,18 +47,20 @@ static inline Color Color_mk_Blue(void) {
     return _v;
 }
 
-#define Color_as_Red(v) \
-    (assert((v).tag == Color_Red && "Color: expected Red"), \
-     (v).Red)
+static inline Color_Red_t Color_as_Red(Color v) {
+    assert(v.tag == Color_Red && "Color: expected Red");
+    return v.Red;
+}
 
-#define Color_as_Green(v) \
-    (assert((v).tag == Color_Green && "Color: expected Green"), \
-     (v).Green)
+static inline Color_Green_t Color_as_Green(Color v) {
+    assert(v.tag == Color_Green && "Color: expected Green");
+    return v.Green;
+}
 
-#define Color_as_Blue(v) \
-    (assert((v).tag == Color_Blue && "Color: expected Blue"), \
-     (v).Blue)
-
+static inline Color_Blue_t Color_as_Blue(Color v) {
+    assert(v.tag == Color_Blue && "Color: expected Blue");
+    return v.Blue;
+}
 
 typedef enum {
     Value_Integer,
@@ -55,11 +70,23 @@ typedef enum {
 } Value_Tag;
 
 typedef struct {
+    int n;
+} Value_Integer_t;
+
+typedef struct {
+    double f;
+} Value_Float_t;
+
+typedef struct {
+    const char *s;
+} Value_String_t;
+
+typedef struct {
     Value_Tag tag;
     union {
-        struct { int n; } Integer;
-        struct { double f; } Float;
-        struct { const char *s; } String;
+        Value_Integer_t Integer;
+        Value_Float_t Float;
+        Value_String_t String;
     };
 } Value;
 
@@ -84,18 +111,20 @@ static inline Value Value_mk_String(const char *s) {
     return _v;
 }
 
-#define Value_as_Integer(v) \
-    (assert((v).tag == Value_Integer && "Value: expected Integer"), \
-     (v).Integer)
+static inline Value_Integer_t Value_as_Integer(Value v) {
+    assert(v.tag == Value_Integer && "Value: expected Integer");
+    return v.Integer;
+}
 
-#define Value_as_Float(v) \
-    (assert((v).tag == Value_Float && "Value: expected Float"), \
-     (v).Float)
+static inline Value_Float_t Value_as_Float(Value v) {
+    assert(v.tag == Value_Float && "Value: expected Float");
+    return v.Float;
+}
 
-#define Value_as_String(v) \
-    (assert((v).tag == Value_String && "Value: expected String"), \
-     (v).String)
-
+static inline Value_String_t Value_as_String(Value v) {
+    assert(v.tag == Value_String && "Value: expected String");
+    return v.String;
+}
 
 int main(void) {
     Color c = Color_mk_Red();

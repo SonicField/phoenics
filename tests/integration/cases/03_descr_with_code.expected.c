@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -7,10 +8,18 @@ typedef enum {
 } Option_int_Tag;
 
 typedef struct {
+    int value;
+} Option_int_Some_t;
+
+typedef struct {
+    char _empty;
+} Option_int_None_t;
+
+typedef struct {
     Option_int_Tag tag;
     union {
-        struct { int value; } Some;
-        struct { char _empty; } None;
+        Option_int_Some_t Some;
+        Option_int_None_t None;
     };
 } Option_int;
 
@@ -27,14 +36,15 @@ static inline Option_int Option_int_mk_None(void) {
     return _v;
 }
 
-#define Option_int_as_Some(v) \
-    (assert((v).tag == Option_int_Some && "Option_int: expected Some"), \
-     (v).Some)
+static inline Option_int_Some_t Option_int_as_Some(Option_int v) {
+    assert(v.tag == Option_int_Some && "Option_int: expected Some");
+    return v.Some;
+}
 
-#define Option_int_as_None(v) \
-    (assert((v).tag == Option_int_None && "Option_int: expected None"), \
-     (v).None)
-
+static inline Option_int_None_t Option_int_as_None(Option_int v) {
+    assert(v.tag == Option_int_None && "Option_int: expected None");
+    return v.None;
+}
 
 int main(void) {
     Option_int x = Option_int_mk_Some(42);

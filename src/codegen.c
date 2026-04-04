@@ -5,6 +5,16 @@
 
 /* --- descr codegen --- */
 
+/* Helper: emit "type name" with correct spacing for pointer types */
+static void emit_type_and_name(Buffer *buf, const char *type, const char *name) {
+    buf_append(buf, type);
+    size_t tlen = strlen(type);
+    if (tlen > 0 && type[tlen - 1] != '*') {
+        buf_append(buf, " ");
+    }
+    buf_append(buf, name);
+}
+
 static void emit_descr(Buffer *buf, const DescrDecl *d) {
     /* Tag enum */
     buf_printf(buf, "typedef enum {\n");
@@ -14,28 +24,29 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
     buf_printf(buf, "    %s__COUNT\n", d->name);
     buf_printf(buf, "} %s_Tag;\n", d->name);
 
-    /* Struct with anonymous union */
-    buf_append(buf, "\ntypedef struct {\n");
+    /* Named variant struct typedefs */
+    for (int i = 0; i < d->variant_count; i++) {
+        const Variant *v = &d->variants[i];
+        buf_printf(buf, "\ntypedef struct {\n");
+        if (v->field_count == 0) {
+            buf_append(buf, "    char _empty;\n");
+        } else {
+            for (int j = 0; j < v->field_count; j++) {
+                buf_append(buf, "    ");
+                emit_type_and_name(buf, v->fields[j].type_name, v->fields[j].field_name);
+                buf_append(buf, ";\n");
+            }
+        }
+        buf_printf(buf, "} %s_%s_t;\n", d->name, v->name);
+    }
+
+    /* Main struct with anonymous union using named variant types */
+    buf_printf(buf, "\ntypedef struct {\n");
     buf_printf(buf, "    %s_Tag tag;\n", d->name);
     buf_append(buf, "    union {\n");
     for (int i = 0; i < d->variant_count; i++) {
-        const Variant *v = &d->variants[i];
-        buf_append(buf, "        struct { ");
-        if (v->field_count == 0) {
-            buf_append(buf, "char _empty; ");
-        } else {
-            for (int j = 0; j < v->field_count; j++) {
-                const Field *f = &v->fields[j];
-                size_t tlen = strlen(f->type_name);
-                buf_append(buf, f->type_name);
-                if (tlen > 0 && f->type_name[tlen - 1] != '*') {
-                    buf_append(buf, " ");
-                }
-                buf_append(buf, f->field_name);
-                buf_append(buf, "; ");
-            }
-        }
-        buf_printf(buf, "} %s;\n", v->name);
+        buf_printf(buf, "        %s_%s_t %s;\n", d->name, d->variants[i].name,
+                   d->variants[i].name);
     }
     buf_append(buf, "    };\n");
     buf_printf(buf, "} %s;\n", d->name);
@@ -51,13 +62,7 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         } else {
             for (int j = 0; j < v->field_count; j++) {
                 if (j > 0) buf_append(buf, ", ");
-                const Field *f = &v->fields[j];
-                size_t tlen = strlen(f->type_name);
-                buf_append(buf, f->type_name);
-                if (tlen > 0 && f->type_name[tlen - 1] != '*') {
-                    buf_append(buf, " ");
-                }
-                buf_append(buf, f->field_name);
+                emit_type_and_name(buf, v->fields[j].type_name, v->fields[j].field_name);
             }
         }
 
@@ -70,21 +75,21 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         }
         buf_append(buf, "    return _v;\n");
         buf_append(buf, "}");
-        /* Add newline after } only if not the last constructor */
         if (i < d->variant_count - 1) {
             buf_append(buf, "\n");
         }
     }
 
-    /* Safe accessor macros — assert tag before accessing variant fields */
-    buf_append(buf, "\n");
+    /* Safe accessor functions — assert tag, return variant struct */
     for (int i = 0; i < d->variant_count; i++) {
         const Variant *v = &d->variants[i];
-        buf_append(buf, "\n");
-        buf_printf(buf, "#define %s_as_%s(v) \\\n", d->name, v->name);
-        buf_printf(buf, "    (assert((v).tag == %s_%s && \"%s: expected %s\"), \\\n",
+        buf_append(buf, "\n\n");
+        buf_printf(buf, "static inline %s_%s_t %s_as_%s(%s v) {\n",
+                   d->name, v->name, d->name, v->name, d->name);
+        buf_printf(buf, "    assert(v.tag == %s_%s && \"%s: expected %s\");\n",
                    d->name, v->name, d->name, v->name);
-        buf_printf(buf, "     (v).%s)\n", v->name);
+        buf_printf(buf, "    return v.%s;\n", v->name);
+        buf_append(buf, "}");
     }
 }
 
@@ -162,6 +167,12 @@ static void emit_match_descr(Buffer *buf, const Program *prog,
 char *codegen(const Program *prog) {
     Buffer buf;
     buf_init(&buf);
+
+    /* Emit #include <assert.h> at the top if any descr declarations exist
+     * (safe accessor functions use assert) */
+    if (prog->descr_count > 0) {
+        buf_append(&buf, "#include <assert.h>\n");
+    }
 
     for (int i = 0; i < prog->chunk_count; i++) {
         const Chunk *c = &prog->chunks[i];

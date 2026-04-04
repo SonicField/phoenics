@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 
 typedef enum {
@@ -7,10 +8,18 @@ typedef enum {
 } X_Tag;
 
 typedef struct {
+    int v;
+} X_A_t;
+
+typedef struct {
+    int w;
+} X_B_t;
+
+typedef struct {
     X_Tag tag;
     union {
-        struct { int v; } A;
-        struct { int w; } B;
+        X_A_t A;
+        X_B_t B;
     };
 } X;
 
@@ -28,14 +37,15 @@ static inline X X_mk_B(int w) {
     return _v;
 }
 
-#define X_as_A(v) \
-    (assert((v).tag == X_A && "X: expected A"), \
-     (v).A)
+static inline X_A_t X_as_A(X v) {
+    assert(v.tag == X_A && "X: expected A");
+    return v.A;
+}
 
-#define X_as_B(v) \
-    (assert((v).tag == X_B && "X: expected B"), \
-     (v).B)
-
+static inline X_B_t X_as_B(X v) {
+    assert(v.tag == X_B && "X: expected B");
+    return v.B;
+}
 
 int main(void) {
     X x = X_mk_A(42);

@@ -1,12 +1,17 @@
+#include <assert.h>
 typedef enum {
     Wrapper_Value,
     Wrapper__COUNT
 } Wrapper_Tag;
 
 typedef struct {
+    int x;
+} Wrapper_Value_t;
+
+typedef struct {
     Wrapper_Tag tag;
     union {
-        struct { int x; } Value;
+        Wrapper_Value_t Value;
     };
 } Wrapper;
 
@@ -17,7 +22,7 @@ static inline Wrapper Wrapper_mk_Value(int x) {
     return _v;
 }
 
-#define Wrapper_as_Value(v) \
-    (assert((v).tag == Wrapper_Value && "Wrapper: expected Value"), \
-     (v).Value)
-
+static inline Wrapper_Value_t Wrapper_as_Value(Wrapper v) {
+    assert(v.tag == Wrapper_Value && "Wrapper: expected Value");
+    return v.Value;
+}
