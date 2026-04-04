@@ -283,16 +283,37 @@ These MUST hold for the system to be correct:
 | `descr` used as an identifier in existing code | phc incorrectly treats it as a keyword | `int descr = 42;` | This is a known incompatibility. Phoenics reserves `descr` and `match_descr`. Document it. |
 | Large passthrough chunks exceed buffer | Memory exhaustion | 100MB C file with one descr at the end | Use streaming/chunked passthrough emission. Don't buffer the entire output. |
 | `#line` directives absent | Compiler errors reference wrong line numbers | Any non-trivial input | v1: no `#line` support (accepted limitation). v2: emit `#line` at each chunk boundary. |
+| Multi-file descr usage | `match_descr` fails with "unknown descr type" when the descr is defined in another file | File B has `#include "shapes.h"` and `match_descr(Shape, s)` where Shape is defined in shapes.phc | v1: single-file constraint — `match_descr` only works when the descr declaration is in the same file. See "Known Limitations" section below. |
+| Position-based codegen limits extensibility | Adding match_descr features that transform body content (destructuring, field binding) requires abandoning source-offset splicing for AST-based emission | Any v2 feature that rewrites case body text | Accepted structural cost. v2 codegen rewrite scoped to match_descr emission only — descr and passthrough codegen are unaffected. |
 
-## Open Questions for Supervisor/alexie
+## Resolved Design Decisions
 
-1. **Variant separator:** Should variants be comma-separated (current: `Circle { ... }, Rectangle { ... }`) or semicolon-separated (`Circle { ... }; Rectangle { ... };`)? Comma is current. Semicolon would be more consistent with C struct/enum member syntax. Both are unambiguous. Recommendation: keep comma — it visually groups variants as "alternatives" rather than "declarations."
+1. **Variant separator:** Comma-separated. Variants are alternatives, not declarations. *(Decided by supervisor)*
+2. **`match_descr` vs standard switch:** Explicit `match_descr` keyword. Avoids type inference complexity. AI-optimised: explicit over terse. *(Decided by supervisor)*
+3. **Header generation:** Implicit in transform pipeline. `.phc` → `.h` works but cross-file `match_descr` is a known limitation (see above). *(Decided by supervisor)*
+4. **Default in match_descr:** No default in v1. Exhaustive matching is the purpose — use raw `switch` for catch-all patterns. *(Decided by supervisor)*
 
-2. **`match_descr` vs standard switch:** Does alexie want the explicit `match_descr` keyword (recommended, see rationale above) or enforcement on standard `switch`? This has major architectural implications.
+## Known Limitations (v1)
 
-3. **Header generation:** Should phc support generating `.h` files from `.phc` headers? The current mechanism (transform and output) handles this implicitly, but we should validate the workflow: `types.phc` → `types.h` via phc, then `#include "types.h"` in other files.
+### Single-File Constraint
 
-4. **Default/wildcard cases in match_descr:** Should `match_descr` support a `default:` case? If yes, exhaustiveness checking is moot when default is present. Recommendation: allow `default:` but emit a warning, since it defeats the purpose of exhaustive matching. The AI should prefer explicit cases.
+phc processes one file at a time without expanding `#include` directives. The semantic analyser resolves descr types only within the current translation unit's source. This means:
+
+- `descr` declarations in file A can generate `.h` output that other files include
+- Other files can use the generated types (structs, enums, constructors) normally — these are standard C
+- **`match_descr` in file B CANNOT reference a descr defined in file A** — phc has no visibility into included headers
+
+**Consequence:** Exhaustive matching — the core safety feature — is only available when the descr and the match_descr are in the same `.phc` file. Cross-file usage falls back to raw `switch` without exhaustiveness checking.
+
+**v2 remediation options (ranked by invasiveness):**
+
+1. **Type manifest files** — phc emits a `.phc-types` manifest alongside each `.h` output, listing descr names and their variants. When processing a file, phc reads manifests for any `#include`d `.h` files that have a corresponding `.phc-types`. Least invasive: no new syntax, no preprocessor interaction.
+
+2. **Explicit import directive** — `phc_import "shapes.phc"` tells phc to parse another `.phc` file for type definitions before processing the current file. Simple to implement but introduces a new directive that duplicates `#include`.
+
+3. **Post-preprocessor position** — Run phc after `cpp` so `#include` is expanded. Gains full type visibility but requires parsing expanded system headers (enormous complexity increase).
+
+4. **Two-pass build** — First pass extracts descr declarations from all `.phc` files into a shared type database. Second pass validates `match_descr` against the database. Requires build system integration.
 
 ## v1 Scope Boundary
 
@@ -304,6 +325,7 @@ These MUST hold for the system to be correct:
 - Error reporting with line numbers
 
 **Out of scope for v1:**
+- Cross-file `match_descr` (see Known Limitations above)
 - `#line` directive emission
 - Nested descr declarations
 - Pattern destructuring in match_descr
