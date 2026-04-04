@@ -1,0 +1,29 @@
+#include <stdio.h>
+
+descr Color {
+    Red {},
+    Green {},
+    Blue {}
+};
+
+descr Value {
+    Integer { int n; },
+    Float { double f; },
+    String { const char *s; }
+};
+
+int main(void) {
+    Color c = Color_mk_Red();
+    Value v = Value_mk_Integer(42);
+    switch (c.tag) {
+    case Color_Red:   printf("red\n"); break;
+    case Color_Green: printf("green\n"); break;
+    case Color_Blue:  printf("blue\n"); break;
+    }
+    switch (v.tag) {
+    case Value_Integer: printf("int: %d\n", v.Integer.n); break;
+    case Value_Float:   printf("float: %f\n", v.Float.f); break;
+    case Value_String:  printf("string: %s\n", v.String.s); break;
+    }
+    return 0;
+}

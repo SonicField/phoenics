@@ -1,0 +1,4 @@
+descr Maybe_int {
+    Just { int value; },
+    Nothing {}
+};

@@ -1,0 +1,19 @@
+#include <stdio.h>
+
+descr Result {
+    Ok { int value; },
+    Err { int code; const char *message; }
+};
+
+int main(void) {
+    Result r = Result_mk_Ok(42);
+    switch (r.tag) {
+    case Result_Ok:
+        printf("ok: %d\n", r.Ok.value);
+        break;
+    case Result_Err:
+        printf("err %d: %s\n", r.Err.code, r.Err.message);
+        break;
+    }
+    return 0;
+}

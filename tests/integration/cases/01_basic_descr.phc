@@ -1,0 +1,5 @@
+descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; },
+    Triangle { double base; double height; }
+};
