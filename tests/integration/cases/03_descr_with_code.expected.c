@@ -2,7 +2,8 @@
 
 typedef enum {
     Option_int_Some,
-    Option_int_None
+    Option_int_None,
+    Option_int__COUNT
 } Option_int_Tag;
 
 typedef struct {
@@ -29,12 +30,13 @@ static inline Option_int Option_int_mk_None(void) {
 int main(void) {
     Option_int x = Option_int_mk_Some(42);
     switch (x.tag) {
-    case Option_int_Some:
-        printf("got %d\n", x.Some.value);
-        break;
-    case Option_int_None:
-        printf("nothing\n");
-        break;
+        case Option_int_Some: {
+            printf("got %d\n", x.Some.value);
+        } break;
+        case Option_int_None: {
+            printf("nothing\n");
+        } break;
+            default: break;
     }
     return 0;
 }

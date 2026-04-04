@@ -1,5 +1,5 @@
 CC ?= clang
-CFLAGS = -std=c11 -Wall -Wextra -Werror -pedantic -g
+CFLAGS = -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -pedantic -g
 SRCDIR = src
 TESTDIR = tests
 BUILDDIR = build
@@ -45,7 +45,12 @@ test-unit: $(UNIT_BINS)
 test-integration: $(BUILDDIR)/phc
 	@echo "=== Integration Tests ==="
 	@$(TESTDIR)/integration/run_tests.sh $(BUILDDIR)/phc
-	@echo "=== All integration tests passed ==="
+
+# Verify the test framework itself works correctly
+test-self:
+	@echo "=== Test Framework Self-Test ==="
+	@$(CC) $(CFLAGS) -Wno-unused-function -o $(BUILDDIR)/test_self $(TESTDIR)/test_self.c
+	@$(BUILDDIR)/test_self
 
 clean:
 	rm -rf $(BUILDDIR)

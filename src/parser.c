@@ -1,0 +1,457 @@
+#include "parser.h"
+#include "lexer.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
+
+/* --- Dynamic array helpers --- */
+
+#define DA_INIT_CAP 8
+
+#define DA_PUSH(arr, count, cap, item) do { \
+    if ((count) >= (cap)) { \
+        (cap) = (cap) ? (cap) * 2 : DA_INIT_CAP; \
+        (arr) = realloc((arr), sizeof(*(arr)) * (size_t)(cap)); \
+    } \
+    (arr)[(count)++] = (item); \
+} while(0)
+
+/* --- Parser state --- */
+
+typedef struct {
+    Lexer lex;
+    Token cur;
+    int error;
+    char error_msg[512];
+    int error_line;
+    const char *source;
+    size_t source_len;
+
+    DescrDecl *descrs;
+    int descr_count;
+    int descr_cap;
+
+    Chunk *chunks;
+    int chunk_count;
+    int chunk_cap;
+
+    size_t passthrough_start;
+} Parser;
+
+static void parser_init(Parser *p, const char *source) {
+    memset(p, 0, sizeof(*p));
+    p->source = source;
+    p->source_len = strlen(source);
+    lexer_init(&p->lex, source);
+    p->cur = lexer_next(&p->lex);
+    p->passthrough_start = 0;
+}
+
+static void parser_error(Parser *p, const char *fmt, ...) {
+    if (p->error) return;
+    p->error = 1;
+    p->error_line = p->cur.line;
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(p->error_msg, sizeof(p->error_msg), fmt, args);
+    va_end(args);
+}
+
+static void next_token(Parser *p) {
+    p->cur = lexer_next(&p->lex);
+}
+
+static int expect(Parser *p, TokenType type) {
+    if (p->cur.type != type) {
+        parser_error(p, "expected token type %d, got %d", type, p->cur.type);
+        return 0;
+    }
+    next_token(p);
+    return 1;
+}
+
+static void add_passthrough(Parser *p, size_t start, size_t end) {
+    if (start >= end) return;
+    Chunk c;
+    memset(&c, 0, sizeof(c));
+    c.type = CHUNK_PASSTHROUGH;
+    c.passthrough.start = start;
+    c.passthrough.end = end;
+    DA_PUSH(p->chunks, p->chunk_count, p->chunk_cap, c);
+}
+
+/* --- Field parsing --- */
+
+static int parse_field(Parser *p, Field *f) {
+    Token tokens[64];
+    int count = 0;
+
+    while (p->cur.type != TOK_SEMICOLON && p->cur.type != TOK_EOF &&
+           p->cur.type != TOK_RBRACE) {
+        if (count >= 64) {
+            parser_error(p, "field declaration too complex");
+            return 0;
+        }
+        tokens[count++] = p->cur;
+        next_token(p);
+    }
+
+    if (count < 2) {
+        parser_error(p, "invalid field declaration: need at least type and name");
+        return 0;
+    }
+    if (p->cur.type != TOK_SEMICOLON) {
+        parser_error(p, "expected ';' after field declaration");
+        return 0;
+    }
+    next_token(p);
+
+    int name_idx = count - 1;
+    if (tokens[name_idx].type != TOK_IDENT) {
+        parser_error(p, "expected field name identifier");
+        return 0;
+    }
+    f->field_name = strndup(tokens[name_idx].value, tokens[name_idx].length);
+
+    char type_buf[256] = {0};
+    size_t type_len = 0;
+    for (int i = 0; i < name_idx; i++) {
+        if (tokens[i].type == TOK_STAR) {
+            if (type_len > 0 && type_buf[type_len - 1] != ' ') {
+                type_buf[type_len++] = ' ';
+            }
+            type_buf[type_len++] = '*';
+        } else if (tokens[i].type == TOK_IDENT) {
+            if (type_len > 0 && type_buf[type_len - 1] != '*') {
+                type_buf[type_len++] = ' ';
+            }
+            size_t vlen = tokens[i].length;
+            memcpy(type_buf + type_len, tokens[i].value, vlen);
+            type_len += vlen;
+        } else {
+            parser_error(p, "unexpected token in type");
+            free(f->field_name);
+            return 0;
+        }
+    }
+    type_buf[type_len] = '\0';
+    f->type_name = strdup(type_buf);
+    return 1;
+}
+
+/* --- descr parsing --- */
+
+static int parse_variant(Parser *p, Variant *v) {
+    if (p->cur.type != TOK_IDENT) {
+        parser_error(p, "expected variant name");
+        return 0;
+    }
+    v->name = strndup(p->cur.value, p->cur.length);
+    v->fields = NULL;
+    v->field_count = 0;
+    next_token(p);
+
+    if (!expect(p, TOK_LBRACE)) return 0;
+
+    int field_cap = 0;
+    while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
+        Field f;
+        if (!parse_field(p, &f)) return 0;
+        DA_PUSH(v->fields, v->field_count, field_cap, f);
+    }
+
+    if (!expect(p, TOK_RBRACE)) return 0;
+    return 1;
+}
+
+static int parse_descr(Parser *p) {
+    if (p->cur.type != TOK_IDENT) {
+        parser_error(p, "expected type name after 'descr'");
+        return 0;
+    }
+
+    DescrDecl d;
+    memset(&d, 0, sizeof(d));
+    d.name = strndup(p->cur.value, p->cur.length);
+    next_token(p);
+
+    if (p->cur.type != TOK_LBRACE) {
+        parser_error(p, "expected '{' after descr type name");
+        free(d.name);
+        return 0;
+    }
+    next_token(p);
+
+    int variant_cap = 0;
+    int first = 1;
+    while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
+        if (!first) {
+            if (p->cur.type == TOK_COMMA) {
+                next_token(p);
+                if (p->cur.type == TOK_RBRACE) break;
+            }
+        }
+        first = 0;
+        Variant v;
+        if (!parse_variant(p, &v)) { free(d.name); return 0; }
+        DA_PUSH(d.variants, d.variant_count, variant_cap, v);
+    }
+
+    if (d.variant_count == 0) {
+        parser_error(p, "descr '%s' must have at least one variant", d.name);
+        free(d.name);
+        return 0;
+    }
+
+    if (!expect(p, TOK_RBRACE)) { free(d.name); return 0; }
+    if (p->cur.type != TOK_SEMICOLON) {
+        parser_error(p, "expected ';' after descr declaration");
+        free(d.name);
+        return 0;
+    }
+    size_t end_pos = p->cur.pos + 1;
+    next_token(p);
+
+    int idx = p->descr_count;
+    DA_PUSH(p->descrs, p->descr_count, p->descr_cap, d);
+
+    Chunk c;
+    memset(&c, 0, sizeof(c));
+    c.type = CHUNK_DESCR;
+    c.descr_index = idx;
+    DA_PUSH(p->chunks, p->chunk_count, p->chunk_cap, c);
+
+    p->passthrough_start = end_pos;
+    return 1;
+}
+
+/* --- match_descr parsing --- */
+
+static int parse_match_descr(Parser *p, size_t keyword_pos) {
+    MatchDescr m;
+    memset(&m, 0, sizeof(m));
+    m.start_pos = keyword_pos;
+
+    if (p->cur.type != TOK_LPAREN) {
+        parser_error(p, "expected '(' after 'match_descr'");
+        return 0;
+    }
+    next_token(p);
+
+    if (p->cur.type != TOK_IDENT) {
+        parser_error(p, "expected type name in match_descr");
+        return 0;
+    }
+    m.type_name = strndup(p->cur.value, p->cur.length);
+    next_token(p);
+
+    if (p->cur.type != TOK_COMMA) {
+        parser_error(p, "expected ',' after type name in match_descr");
+        free(m.type_name);
+        return 0;
+    }
+    next_token(p);
+
+    /* Capture expression text until matching ) */
+    size_t expr_start = p->cur.pos;
+    int paren_depth = 0;
+    while (p->cur.type != TOK_EOF) {
+        if (p->cur.type == TOK_LPAREN) paren_depth++;
+        if (p->cur.type == TOK_RPAREN) {
+            if (paren_depth == 0) break;
+            paren_depth--;
+        }
+        next_token(p);
+    }
+    size_t expr_end = p->cur.pos;
+    while (expr_end > expr_start &&
+           (p->source[expr_end - 1] == ' ' || p->source[expr_end - 1] == '\t')) {
+        expr_end--;
+    }
+    m.expr_text = strndup(p->source + expr_start, expr_end - expr_start);
+
+    if (p->cur.type != TOK_RPAREN) {
+        parser_error(p, "expected ')' in match_descr");
+        free(m.type_name);
+        free(m.expr_text);
+        return 0;
+    }
+    m.header_end_pos = p->cur.pos + 1;
+    next_token(p);
+
+    if (p->cur.type != TOK_LBRACE) {
+        parser_error(p, "expected '{' in match_descr");
+        free(m.type_name);
+        free(m.expr_text);
+        return 0;
+    }
+    m.lbrace_pos = p->cur.pos;
+    next_token(p);
+
+    /* Parse cases */
+    int case_cap = 0;
+    while (p->cur.type == TOK_CASE) {
+        next_token(p); /* consume 'case' */
+
+        if (p->cur.type != TOK_IDENT) {
+            parser_error(p, "expected variant name after 'case' in match_descr");
+            free(m.type_name);
+            free(m.expr_text);
+            return 0;
+        }
+
+        MatchCase mc;
+        memset(&mc, 0, sizeof(mc));
+        mc.variant_name = strndup(p->cur.value, p->cur.length);
+        mc.name_pos = p->cur.pos;
+        mc.name_len = p->cur.length;
+        next_token(p);
+
+        if (p->cur.type != TOK_COLON) {
+            parser_error(p, "expected ':' after variant name in match_descr case");
+            free(mc.variant_name);
+            free(m.type_name);
+            free(m.expr_text);
+            return 0;
+        }
+        next_token(p);
+
+        /* Capture case body text: from current pos to after } [break;] */
+        size_t body_start = p->cur.pos;
+
+        if (p->cur.type != TOK_LBRACE) {
+            parser_error(p, "expected '{' to open case body in match_descr");
+            free(mc.variant_name);
+            free(m.type_name);
+            free(m.expr_text);
+            return 0;
+        }
+
+        int depth = 0;
+        while (p->cur.type != TOK_EOF) {
+            if (p->cur.type == TOK_LBRACE) depth++;
+            if (p->cur.type == TOK_RBRACE) {
+                depth--;
+                if (depth == 0) {
+                    next_token(p);
+                    break;
+                }
+            }
+            next_token(p);
+        }
+
+        /* Optional break; after } */
+        if (p->cur.type == TOK_BREAK) {
+            next_token(p);
+            if (p->cur.type == TOK_SEMICOLON) {
+                next_token(p);
+            }
+        }
+
+        size_t body_end = p->cur.pos;
+        /* Trim trailing whitespace from body */
+        while (body_end > body_start &&
+               (p->source[body_end - 1] == ' ' || p->source[body_end - 1] == '\t' ||
+                p->source[body_end - 1] == '\n' || p->source[body_end - 1] == '\r')) {
+            body_end--;
+        }
+        mc.body_text = strndup(p->source + body_start, body_end - body_start);
+
+        DA_PUSH(m.cases, m.case_count, case_cap, mc);
+    }
+
+    if (p->cur.type != TOK_RBRACE) {
+        parser_error(p, "expected '}' to close match_descr");
+        free(m.type_name);
+        free(m.expr_text);
+        return 0;
+    }
+    m.rbrace_pos = p->cur.pos;
+    m.end_pos = p->cur.pos + 1;
+    next_token(p);
+
+    Chunk c;
+    memset(&c, 0, sizeof(c));
+    c.type = CHUNK_MATCH_DESCR;
+    c.match_descr = m;
+    DA_PUSH(p->chunks, p->chunk_count, p->chunk_cap, c);
+
+    p->passthrough_start = m.end_pos;
+    return 1;
+}
+
+/* --- Main parse loop --- */
+
+ParseResult parse(const char *source) {
+    Parser p;
+    parser_init(&p, source);
+
+    while (p.cur.type != TOK_EOF && !p.error) {
+        if (p.cur.type == TOK_DESCR) {
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            next_token(&p);
+            parse_descr(&p);
+        } else if (p.cur.type == TOK_MATCH_DESCR) {
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            size_t kw_pos = p.cur.pos;
+            next_token(&p);
+            parse_match_descr(&p, kw_pos);
+        } else {
+            next_token(&p);
+        }
+    }
+
+    if (!p.error) {
+        add_passthrough(&p, p.passthrough_start, p.source_len);
+    }
+
+    ParseResult result;
+    memset(&result, 0, sizeof(result));
+    if (p.error) {
+        result.error = 1;
+        result.error_message = strdup(p.error_msg);
+        result.error_line = p.error_line;
+    }
+    result.program.source = source;
+    result.program.source_len = p.source_len;
+    result.program.descrs = p.descrs;
+    result.program.descr_count = p.descr_count;
+    result.program.chunks = p.chunks;
+    result.program.chunk_count = p.chunk_count;
+
+    return result;
+}
+
+void parse_result_free(ParseResult *result) {
+    free(result->error_message);
+    for (int i = 0; i < result->program.descr_count; i++) {
+        DescrDecl *d = &result->program.descrs[i];
+        free(d->name);
+        for (int j = 0; j < d->variant_count; j++) {
+            free(d->variants[j].name);
+            for (int k = 0; k < d->variants[j].field_count; k++) {
+                free(d->variants[j].fields[k].type_name);
+                free(d->variants[j].fields[k].field_name);
+            }
+            free(d->variants[j].fields);
+        }
+        free(d->variants);
+    }
+    free(result->program.descrs);
+    for (int i = 0; i < result->program.chunk_count; i++) {
+        Chunk *c = &result->program.chunks[i];
+        if (c->type == CHUNK_MATCH_DESCR) {
+            MatchDescr *m = &c->match_descr;
+            free(m->type_name);
+            free(m->expr_text);
+            for (int j = 0; j < m->case_count; j++) {
+                free(m->cases[j].variant_name);
+                free(m->cases[j].body_text);
+            }
+            free(m->cases);
+        }
+    }
+    free(result->program.chunks);
+    memset(result, 0, sizeof(*result));
+}

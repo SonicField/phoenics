@@ -1,0 +1,23 @@
+# Build artifacts
+build/
+
+# Editor/IDE files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# NBS transient files
+.nbs/pids/
+.nbs/events/
+.nbs/logs/
+.nbs/chat/*.lock
+.nbs/chat/*.cursors
+.nbs/sessions/
+.nbs/nbs-claude-*.log
+.nbs/fixup-last-run
+.nbs/librarian-last-run
+.nbs/pythia-last-run
+.nbs/shepard-last-run
+.nbs/control-registry-*

@@ -15,15 +15,15 @@ descr Value {
 int main(void) {
     Color c = Color_mk_Red();
     Value v = Value_mk_Integer(42);
-    switch (c.tag) {
-    case Color_Red:   printf("red\n"); break;
-    case Color_Green: printf("green\n"); break;
-    case Color_Blue:  printf("blue\n"); break;
+    match_descr(Color, c) {
+        case Red:   { printf("red\n"); } break;
+        case Green: { printf("green\n"); } break;
+        case Blue:  { printf("blue\n"); } break;
     }
-    switch (v.tag) {
-    case Value_Integer: printf("int: %d\n", v.Integer.n); break;
-    case Value_Float:   printf("float: %f\n", v.Float.f); break;
-    case Value_String:  printf("string: %s\n", v.String.s); break;
+    match_descr(Value, v) {
+        case Integer: { printf("int: %d\n", v.Integer.n); } break;
+        case Float:   { printf("float: %f\n", v.Float.f); } break;
+        case String:  { printf("string: %s\n", v.String.s); } break;
     }
     return 0;
 }

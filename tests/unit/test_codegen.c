@@ -85,10 +85,140 @@ TEST(codegen_passthrough_preserved) {
     parse_result_free(&pr);
 }
 
+TEST(codegen_multiple_descrs) {
+    const char *src =
+        "descr A { X { int a; } };\n"
+        "descr B { Y { int b; } };\n";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    ASSERT(contains(out, "A_Tag"));
+    ASSERT(contains(out, "B_Tag"));
+    ASSERT(contains(out, "A_mk_X"));
+    ASSERT(contains(out, "B_mk_Y"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
+TEST(codegen_multi_field_constructor) {
+    const char *src = "descr P { Point { int x; int y; int z; } };";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    ASSERT(contains(out, "P_mk_Point(int x, int y, int z)"));
+    ASSERT(contains(out, "_v.Point.x = x;"));
+    ASSERT(contains(out, "_v.Point.y = y;"));
+    ASSERT(contains(out, "_v.Point.z = z;"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
+TEST(codegen_descr_between_code_ordering) {
+    /* Verify that codegen preserves ordering: header, descr expansion, footer */
+    const char *src =
+        "#include <stdio.h>\n"
+        "descr V { A { int x; } };\n"
+        "int main(void) { return 0; }\n";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+
+    /* #include must appear before the typedef */
+    const char *inc_pos = strstr(out, "#include <stdio.h>");
+    const char *td_pos = strstr(out, "typedef enum");
+    const char *main_pos = strstr(out, "int main");
+    ASSERT_NOT_NULL(inc_pos);
+    ASSERT_NOT_NULL(td_pos);
+    ASSERT_NOT_NULL(main_pos);
+    ASSERT(inc_pos < td_pos);
+    ASSERT(td_pos < main_pos);
+
+    free(out);
+    parse_result_free(&pr);
+}
+
+/* --- __COUNT sentinel --- */
+
+TEST(codegen_count_sentinel) {
+    const char *src = "descr Shape { Circle { double r; }, Rect { int w; } };";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    ASSERT(contains(out, "Shape__COUNT"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
+/* --- match_descr codegen --- */
+
+TEST(codegen_match_descr_generates_switch) {
+    const char *src =
+        "descr Shape { Circle { double r; }, Rect { int w; } };\n"
+        "match_descr(Shape, s) {\n"
+        "    case Circle: { foo(); } break;\n"
+        "    case Rect: { bar(); } break;\n"
+        "}\n";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    /* match_descr should generate a standard switch on .tag */
+    ASSERT(contains(out, "switch (s.tag)"));
+    /* Case labels should be prefixed with type name */
+    ASSERT(contains(out, "case Shape_Circle:"));
+    ASSERT(contains(out, "case Shape_Rect:"));
+    /* Should include default: break; for __COUNT sentinel */
+    ASSERT(contains(out, "default:"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
+TEST(codegen_match_descr_preserves_body) {
+    const char *src =
+        "descr AB { A { int x; }, B { int y; } };\n"
+        "match_descr(AB, v) {\n"
+        "    case A: { printf(\"%d\", v.A.x); } break;\n"
+        "    case B: { printf(\"%d\", v.B.y); } break;\n"
+        "}\n";
+    ParseResult pr = parse(src);
+    ASSERT_EQ(pr.error, 0);
+
+    char *out = codegen(&pr.program);
+    ASSERT_NOT_NULL(out);
+    /* Case bodies should be preserved in the output */
+    ASSERT(contains(out, "v.A.x"));
+    ASSERT(contains(out, "v.B.y"));
+
+    free(out);
+    parse_result_free(&pr);
+}
+
 TEST_MAIN(
+    /* descr codegen */
     RUN_TEST(codegen_tag_enum);
     RUN_TEST(codegen_struct_with_union);
     RUN_TEST(codegen_constructor_functions);
     RUN_TEST(codegen_empty_variant_constructor);
     RUN_TEST(codegen_passthrough_preserved);
+    RUN_TEST(codegen_multiple_descrs);
+    RUN_TEST(codegen_multi_field_constructor);
+    RUN_TEST(codegen_descr_between_code_ordering);
+    /* __COUNT sentinel */
+    RUN_TEST(codegen_count_sentinel);
+    /* match_descr codegen */
+    RUN_TEST(codegen_match_descr_generates_switch);
+    RUN_TEST(codegen_match_descr_preserves_body);
 )

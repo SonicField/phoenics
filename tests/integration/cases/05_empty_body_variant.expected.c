@@ -1,6 +1,7 @@
 typedef enum {
     Maybe_int_Just,
-    Maybe_int_Nothing
+    Maybe_int_Nothing,
+    Maybe_int__COUNT
 } Maybe_int_Tag;
 
 typedef struct {

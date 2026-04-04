@@ -1,0 +1,7 @@
+int main(void) {
+    int x = 0;
+    match_descr(NoSuchType, x) {
+        case Foo: { break; }
+    }
+    return 0;
+}

@@ -174,6 +174,35 @@ static int _tf_current_failed = 0;
         } \
     } while(0)
 
+/* Length-aware string comparison for tokens with pointer+length (not null-terminated) */
+#define ASSERT_STRN_EQ(ptr, len, expected) \
+    do { \
+        const char *_sp = (ptr); \
+        size_t _sl = (size_t)(len); \
+        const char *_se = (expected); \
+        size_t _el = strlen(_se); \
+        if (_sp == NULL) { \
+            printf("\n    ASSERT_STRN_EQ FAILED: %s is NULL\n" \
+                   "    expected: \"%s\" (len %zu)\n" \
+                   "    at %s:%d\n", \
+                   #ptr, _se, _el, __FILE__, __LINE__); \
+            _tf_current_failed = 1; \
+            return; \
+        } \
+        if (_sl != _el || memcmp(_sp, _se, _sl) != 0) { \
+            printf("\n    ASSERT_STRN_EQ FAILED: %s (len %zu) == \"%s\"\n" \
+                   "    expected: \"%s\" (len %zu)\n" \
+                   "    actual:   \"%.*s\" (len %zu)\n" \
+                   "    at %s:%d\n", \
+                   #ptr, _sl, _se, \
+                   _se, _el, \
+                   (int)_sl, _sp, _sl, \
+                   __FILE__, __LINE__); \
+            _tf_current_failed = 1; \
+            return; \
+        } \
+    } while(0)
+
 #define ASSERT_TRUE(expr)  ASSERT(expr)
 #define ASSERT_FALSE(expr) ASSERT(!(expr))
 

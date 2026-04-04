@@ -1,0 +1,3 @@
+descr Wrapper {
+    Value { int x; }
+};

@@ -16,7 +16,9 @@
 set -euo pipefail
 
 CC="${CC:-clang}"
-CFLAGS="-std=c11 -Wall -Wextra -Werror -pedantic"
+# -Wno-unused-function: generated descr constructors are static inline and
+# may not all be called in every test case. This is expected for generated code.
+CFLAGS="-std=c11 -Wall -Wextra -Werror -pedantic -Wno-unused-function"
 PHC="$1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CASES_DIR="$SCRIPT_DIR/cases"
@@ -85,7 +87,13 @@ for input_file in "$CASES_DIR"/*.phc; do
         out_c="$TMPDIR/${base}.c"
         out_bin="$TMPDIR/${base}"
         echo "$actual" > "$out_c"
-        if ! $CC $CFLAGS -o "$out_bin" "$out_c" 2>"$TMPDIR/${base}.compile_err"; then
+        # If no main() function, compile only (-c); otherwise link to binary
+        if echo "$actual" | grep -q 'int main'; then
+            compile_cmd="$CC $CFLAGS -o $out_bin $out_c"
+        else
+            compile_cmd="$CC $CFLAGS -c -o ${out_bin}.o $out_c"
+        fi
+        if ! eval "$compile_cmd" 2>"$TMPDIR/${base}.compile_err"; then
             echo "FAIL (output does not compile)"
             echo "    Compiler errors:"
             sed 's/^/    /' "$TMPDIR/${base}.compile_err" | head -20

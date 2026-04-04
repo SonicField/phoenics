@@ -1,0 +1,20 @@
+#include <stdio.h>
+
+descr Color {
+    Red {},
+    Green {},
+    Blue {}
+};
+
+/* Raw switch on descr tag — NOT match_descr.
+ * PHC must NOT enforce exhaustiveness here.
+ * The switch passes through unchanged. */
+int main(void) {
+    Color c = Color_mk_Green();
+    switch (c.tag) {
+    case Color_Red:   printf("red\n"); break;
+    case Color_Green: printf("green\n"); break;
+    default: printf("other\n"); break;
+    }
+    return 0;
+}

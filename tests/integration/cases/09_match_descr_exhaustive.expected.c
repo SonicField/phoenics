@@ -1,7 +1,8 @@
+#include <stdio.h>
+
 typedef enum {
     Shape_Circle,
     Shape_Rectangle,
-    Shape_Triangle,
     Shape__COUNT
 } Shape_Tag;
 
@@ -10,7 +11,6 @@ typedef struct {
     union {
         struct { double radius; } Circle;
         struct { double width; double height; } Rectangle;
-        struct { double base; double height; } Triangle;
     };
 } Shape;
 
@@ -29,10 +29,16 @@ static inline Shape Shape_mk_Rectangle(double width, double height) {
     return _v;
 }
 
-static inline Shape Shape_mk_Triangle(double base, double height) {
-    Shape _v;
-    _v.tag = Shape_Triangle;
-    _v.Triangle.base = base;
-    _v.Triangle.height = height;
-    return _v;
+int main(void) {
+    Shape s = Shape_mk_Circle(3.14);
+    switch (s.tag) {
+        case Shape_Circle: {
+            printf("circle r=%g\n", s.Circle.radius);
+        } break;
+        case Shape_Rectangle: {
+            printf("rect %gx%g\n", s.Rectangle.width, s.Rectangle.height);
+        } break;
+            default: break;
+    }
+    return 0;
 }

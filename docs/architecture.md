@@ -1,0 +1,313 @@
+# Phoenics (phc) Architecture
+
+## Terminal Goal
+
+Build `phc` — a source-to-source C translator that adds first-class discriminated unions (sum types) to C11 via the `descr` keyword. AI-optimised syntax. Emits standard C11 that compiles with clang and gcc.
+
+## Pipeline Position
+
+```
+source.phc  -->  phc  -->  source.c  -->  cc (clang/gcc, full pipeline)
+```
+
+phc operates on original source files BEFORE the preprocessor. It transforms Phoenics extensions into standard C and passes everything else through unchanged. The output `.c` file then enters the normal compile pipeline (preprocessing, compilation, linking).
+
+**Rationale:** Running before the preprocessor means phc sees manageable source files, not thousands of lines of expanded system headers. `#include` directives pass through untouched.
+
+**Falsifier:** If a user needs `descr` definitions generated or manipulated by the C preprocessor (e.g., conditionally compiled variants via `#ifdef`), the pre-preprocessor position breaks. This would require phc to run after preprocessing. For v1, we accept this limitation. Document it. If it becomes a real need, we revisit.
+
+## Phoenics Language Extensions
+
+### 1. `descr` Declaration
+
+**Syntax:**
+
+```
+descr <TypeName> {
+    <VariantName> { <field-type> <field-name>; ... },
+    <VariantName> { <field-type> <field-name>; ... },
+    ...
+};
+```
+
+**Rules:**
+- `TypeName` MUST be a valid C identifier
+- EXACTLY ONE or more variants MUST be present (zero variants is an error)
+- Each `VariantName` MUST be a valid C identifier, unique within the descr
+- Each variant CONTAINS ZERO OR MORE fields
+- Fields follow C declaration syntax: type followed by name followed by semicolon
+- Variants are separated by commas; the last variant MAY omit the trailing comma
+- The descr block ends with `};`
+
+**Generated C11 output for `descr Shape { Circle { double radius; }, Rectangle { double width; double height; } };`:**
+
+```c
+/* --- descr Shape --- */
+typedef enum {
+    Shape_Circle,
+    Shape_Rectangle,
+    Shape__COUNT   /* variant count for validation */
+} Shape_Tag;
+
+typedef struct {
+    Shape_Tag tag;
+    union {
+        struct { double radius; } Circle;
+        struct { double width; double height; } Rectangle;
+    };
+} Shape;
+
+static inline Shape Shape_mk_Circle(double radius) {
+    Shape _v;
+    _v.tag = Shape_Circle;
+    _v.Circle.radius = radius;
+    return _v;
+}
+
+static inline Shape Shape_mk_Rectangle(double width, double height) {
+    Shape _v;
+    _v.tag = Shape_Rectangle;
+    _v.Rectangle.width = width;
+    _v.Rectangle.height = height;
+    return _v;
+}
+```
+
+**Design choices:**
+
+| Choice | Rationale |
+|--------|-----------|
+| `Shape_Tag` enum name | Avoids collision with the struct name. Consistent naming: `<Type>_Tag`. |
+| `Shape_Circle` enum values | `<Type>_<Variant>` is unambiguous, grep-friendly, AI-readable. |
+| `Shape__COUNT` sentinel | Enables runtime tag validation (`assert(v.tag < Shape__COUNT)`). Double underscore signals "not a real variant." |
+| Anonymous union | C11 feature. Allows `v.Circle.radius` instead of `v.u.Circle.radius`. |
+| `static inline` constructors | Works across translation units without linker issues. Compiler optimises away the function call. |
+| `_v` local name | Unlikely to collide. Prefixed underscore + lowercase is reserved in file scope but legal in block scope. |
+| Empty variants get `struct { char _empty; }` | C forbids zero-size structs. The `_empty` field occupies 1 byte and is never accessed. |
+
+### 2. `match_descr` — Exhaustive Discrimination
+
+This is the hardest problem. Two options exist.
+
+**Option A: Enhance standard `switch`**
+
+phc recognises `switch (expr.tag)` where the tag belongs to a known descr type, parses the case labels, and errors if any variant is missing.
+
+- **Pro:** No new syntax. Standard C switch idiom.
+- **Con:** Requires phc to know the type of `expr`. This means tracking variable declarations, function parameters, struct members, and scope — essentially building a type inference engine. This is 80% of a C compiler's semantic analysis. Enormous effort for v1.
+- **Falsifier:** `switch (get_shape().tag)` — phc would need to know the return type of `get_shape()`. This requires parsing function declarations, which requires parsing headers, which requires a full C front-end.
+
+**Option B: Explicit `match_descr` keyword**
+
+```
+match_descr(<TypeName>, <expr>) {
+    case <VariantName>: { ... } break;
+    case <VariantName>: { ... } break;
+    ...
+}
+```
+
+- **Pro:** phc knows the type from the keyword syntax — no type inference needed. Trivially parseable. AI-friendly: explicit is better than implicit. Consistent with the "AI-optimised" design directive.
+- **Con:** New syntax that doesn't exist in standard C. But that's the entire point of Phoenics.
+- **Falsifier:** If the type name is wrong (doesn't match a known descr), phc can detect and report it at transpile time.
+
+**Recommendation: Option B.** The AI-optimised design directive says "explicit over terse." Type inference is the single largest source of complexity in C tooling. Avoiding it keeps phc implementable and maintainable.
+
+**Generated C for `match_descr(Shape, s) { case Circle: { ... } break; case Rectangle: { ... } break; }`:**
+
+```c
+switch (s.tag) {
+    case Shape_Circle: { ... } break;
+    case Shape_Rectangle: { ... } break;
+    default: break;
+}
+```
+
+The `default: break;` is required because the generated enum includes `Shape__COUNT`. Without it, `-Wswitch` warns about the unhandled `__COUNT` value, violating invariant #2 (no warnings with `-Werror`).
+
+**Exhaustiveness checking:** phc looks up the descr definition for `Shape`, collects all variant names from the case labels, and reports an error listing the missing variants. This check happens at transpile time — it is a phc error, not a C compiler error.
+
+**Future extension:** `match_descr` could support destructuring (binding variant fields to local variables), but this is not required for v1. The v1 form requires the programmer to access fields via `expr.VariantName.field`.
+
+### 3. Construction Syntax
+
+For v1, use the generated constructor functions:
+
+```c
+Shape s = Shape_mk_Circle(42.0);
+```
+
+This is explicit, unambiguous, and requires no new syntax. The AI can write it without difficulty.
+
+### 4. Tag Access and Field Access
+
+For v1, direct member access:
+
+```c
+s.tag           /* Shape_Tag enum value */
+s.Circle.radius /* field access (only valid when s.tag == Shape_Circle) */
+```
+
+phc does NOT enforce safe access in v1 — that would require data-flow analysis (knowing which branch of a switch we're in). The generated C lets the programmer access any variant's fields regardless of tag. This matches C's existing safety model. Runtime assertions can be added by the programmer:
+
+```c
+assert(s.tag == Shape_Circle);
+double r = s.Circle.radius;
+```
+
+**Future extension:** phc could generate accessor functions with built-in tag assertions, e.g., `Shape_as_Circle(s)` that asserts the tag and returns a pointer to the Circle struct.
+
+## Internal Architecture
+
+### Components
+
+```
+Input (.phc)
+    |
+    v
++--------+     +--------+     +----------+     +---------+
+| Lexer  | --> | Parser | --> | Semantic | --> | Codegen |
++--------+     +--------+     +----------+     +---------+
+                                                    |
+                                                    v
+                                              Output (.c)
+```
+
+### Lexer
+
+Scans input text and produces a token stream.
+
+**Token types (v1):**
+
+| Token | Matches |
+|-------|---------|
+| `TOK_DESCR` | `descr` keyword |
+| `TOK_MATCH_DESCR` | `match_descr` keyword |
+| `TOK_IDENT` | C identifiers |
+| `TOK_LBRACE` / `TOK_RBRACE` | `{` / `}` |
+| `TOK_LPAREN` / `TOK_RPAREN` | `(` / `)` |
+| `TOK_SEMICOLON` | `;` |
+| `TOK_COMMA` | `,` |
+| `TOK_STAR` | `*` |
+| `TOK_COLON` | `:` |
+| `TOK_CASE` | `case` keyword |
+| `TOK_BREAK` | `break` keyword |
+| `TOK_OTHER` | Passthrough text chunks |
+| `TOK_EOF` | End of input |
+
+**Dual-mode operation:**
+
+The lexer operates in two modes:
+
+1. **Passthrough mode** (default): Scans forward through the source, consuming text verbatim as a single `TOK_OTHER` token. Respects string literal, character literal, and comment boundaries (does not scan for keywords inside them). Stops when it encounters a Phoenics keyword (`descr` or `match_descr`) at a valid position.
+
+2. **Structured mode** (after encountering a keyword): Produces individual tokens (`TOK_IDENT`, `TOK_LBRACE`, `TOK_SEMICOLON`, etc.). Tracks brace depth. Returns to passthrough mode when the Phoenics construct ends (`};` for descr, closing `}` at depth 0 for match_descr).
+
+Structural token types (`TOK_LBRACE`, `TOK_CASE`, etc.) are ONLY produced in structured mode. In passthrough mode, braces, case labels, and all other C syntax are absorbed into `TOK_OTHER` verbatim. This guarantees passthrough fidelity: passthrough text is never tokenized and reassembled.
+
+**Critical invariant:** The lexer MUST NOT match keywords inside string literals, character literals, or comments. The lexer must consume these correctly to avoid false matches. In passthrough mode, the lexer must also correctly skip these constructs to avoid prematurely ending a `TOK_OTHER` chunk.
+
+**Falsifier:** Input containing `char *s = "descr Shape { ... }";` — the lexer must NOT treat the string contents as a descr declaration.
+
+### Parser
+
+Consumes the token stream and produces a Program AST.
+
+**AST structure:**
+
+```
+Program
+    |
+    +-- chunks[] (interleaved, ordered)
+            |
+            +-- PassthroughChunk { text }
+            +-- DescrDecl { name, variants[] }
+            |       |
+            |       +-- Variant { name, fields[] }
+            |               |
+            |               +-- Field { type_name, field_name }
+            +-- MatchDescr { type_name, expr_text, cases[] }
+                    |
+                    +-- MatchCase { variant_name, body_text }
+```
+
+The Program is an ordered sequence of chunks. Each chunk is either passthrough text, a descr declaration, or a match_descr construct. Ordering preserves the original source structure — this is how codegen reconstructs the output.
+
+**Parser modes:**
+1. **Scanning mode:** Consume TOK_OTHER chunks. When a TOK_DESCR or TOK_MATCH_DESCR is encountered, switch to structured parsing.
+2. **Descr parsing:** Parse the full `descr TypeName { ... };` grammar.
+3. **Match parsing:** Parse `match_descr(TypeName, expr) { case Variant: { ... } break; ... }`.
+
+### Semantic Analyser
+
+Operates on the parsed AST.
+
+**Responsibilities:**
+1. **Build descr type table:** Map type names to their variant lists.
+2. **Validate descr declarations:** No duplicate variant names. At least one variant.
+3. **Validate match_descr:** The type name must reference a known descr. Check exhaustiveness: every variant in the descr must have a corresponding case. Report missing variants by name.
+4. **Duplicate case detection:** A match_descr with the same variant twice is an error.
+
+**What it does NOT do:**
+- Type checking of field types (the C compiler handles this)
+- Scope analysis (phc doesn't track variable scope)
+- Type inference (phc doesn't know variable types)
+
+### Code Generator
+
+Walks the AST and emits C11.
+
+**For each chunk type:**
+- **PassthroughChunk:** Emit text verbatim.
+- **DescrDecl:** Emit the tag enum, the struct with union, and the constructor functions (as specified above).
+- **MatchDescr:** Emit a standard `switch` on `expr.tag` with case labels prefixed by the type name.
+
+## Key Invariants
+
+These MUST hold for the system to be correct:
+
+1. **Passthrough fidelity:** Non-Phoenics code MUST pass through byte-for-byte identical. `phc(standard_c) == standard_c`.
+2. **Valid C11 output:** The output MUST compile with both `clang -std=c11 -Wall -Werror` and `gcc -std=c11 -Wall -Werror` without warnings.
+3. **Exhaustiveness completeness:** If a `match_descr` is missing a variant, phc MUST report an error. If all variants are present, phc MUST NOT report an error. No false positives, no false negatives.
+4. **Tag-value correspondence:** The generated enum values MUST correspond 1:1 with the variant names. The constructors MUST set the tag to the correct enum value.
+5. **Name uniqueness:** Within a descr, all variant names MUST be unique. Across a translation unit, all descr type names MUST be unique (or phc reports a duplicate error).
+6. **Keyword isolation:** `descr` and `match_descr` MUST NOT be recognised inside string literals, character literals, or C comments.
+
+## Risks
+
+| Risk | Impact | Falsifier | Mitigation |
+|------|--------|-----------|------------|
+| C type syntax is complex (multi-word types, function pointers, arrays) | Parser fails on valid field declarations | `descr Foo { Bar { void (*callback)(int); } };` | v1: support only simple types, pointers, and multi-word qualifiers. Document unsupported forms. |
+| Nested descr types | Code generator produces invalid C | `descr Outer { A { descr Inner { X {}; } inner; } };` | v1: prohibit nested descr. Descr declarations at file scope only. |
+| Recursive descr types | Struct contains itself (infinite size) | `descr List { Cons { int head; List tail; } };` | Must use pointer: `List *tail`. phc does not check this — the C compiler will error on infinite-size struct. Document the pattern. |
+| `descr` used as an identifier in existing code | phc incorrectly treats it as a keyword | `int descr = 42;` | This is a known incompatibility. Phoenics reserves `descr` and `match_descr`. Document it. |
+| Large passthrough chunks exceed buffer | Memory exhaustion | 100MB C file with one descr at the end | Use streaming/chunked passthrough emission. Don't buffer the entire output. |
+| `#line` directives absent | Compiler errors reference wrong line numbers | Any non-trivial input | v1: no `#line` support (accepted limitation). v2: emit `#line` at each chunk boundary. |
+
+## Open Questions for Supervisor/alexie
+
+1. **Variant separator:** Should variants be comma-separated (current: `Circle { ... }, Rectangle { ... }`) or semicolon-separated (`Circle { ... }; Rectangle { ... };`)? Comma is current. Semicolon would be more consistent with C struct/enum member syntax. Both are unambiguous. Recommendation: keep comma — it visually groups variants as "alternatives" rather than "declarations."
+
+2. **`match_descr` vs standard switch:** Does alexie want the explicit `match_descr` keyword (recommended, see rationale above) or enforcement on standard `switch`? This has major architectural implications.
+
+3. **Header generation:** Should phc support generating `.h` files from `.phc` headers? The current mechanism (transform and output) handles this implicitly, but we should validate the workflow: `types.phc` → `types.h` via phc, then `#include "types.h"` in other files.
+
+4. **Default/wildcard cases in match_descr:** Should `match_descr` support a `default:` case? If yes, exhaustiveness checking is moot when default is present. Recommendation: allow `default:` but emit a warning, since it defeats the purpose of exhaustive matching. The AI should prefer explicit cases.
+
+## v1 Scope Boundary
+
+**In scope:**
+- `descr` declarations with simple field types (identifiers, `*` pointers, multi-word qualifiers)
+- Generated tag enum, struct with anonymous union, constructor functions
+- `match_descr` with exhaustiveness checking
+- Passthrough of all non-Phoenics code
+- Error reporting with line numbers
+
+**Out of scope for v1:**
+- `#line` directive emission
+- Nested descr declarations
+- Pattern destructuring in match_descr
+- Safe accessor functions with tag assertions
+- Conditional compilation interaction (`#ifdef` around descr)
+- Function pointer or array field types
+- Forward declarations of descr types

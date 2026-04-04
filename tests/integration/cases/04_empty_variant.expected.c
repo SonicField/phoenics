@@ -2,7 +2,8 @@
 
 typedef enum {
     Result_Ok,
-    Result_Err
+    Result_Err,
+    Result__COUNT
 } Result_Tag;
 
 typedef struct {
@@ -31,12 +32,13 @@ static inline Result Result_mk_Err(int code, const char *message) {
 int main(void) {
     Result r = Result_mk_Ok(42);
     switch (r.tag) {
-    case Result_Ok:
-        printf("ok: %d\n", r.Ok.value);
-        break;
-    case Result_Err:
-        printf("err %d: %s\n", r.Err.code, r.Err.message);
-        break;
+        case Result_Ok: {
+            printf("ok: %d\n", r.Ok.value);
+        } break;
+        case Result_Err: {
+            printf("err %d: %s\n", r.Err.code, r.Err.message);
+        } break;
+            default: break;
     }
     return 0;
 }
