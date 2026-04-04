@@ -23,7 +23,7 @@ TEST(sem_builds_type_table) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT_EQ(sr.error, 0);
     ASSERT_EQ(sr.descr_type_count, 1);
     ASSERT_STR_EQ(sr.descr_types[0].name, "Shape");
@@ -40,7 +40,7 @@ TEST(sem_builds_multiple_types) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT_EQ(sr.error, 0);
     ASSERT_EQ(sr.descr_type_count, 2);
 
@@ -55,7 +55,7 @@ TEST(sem_error_duplicate_variant_name) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
     ASSERT_STR_CONTAINS(sr.error_message, "duplicate variant");
@@ -71,7 +71,7 @@ TEST(sem_error_duplicate_descr_name) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
     ASSERT_STR_CONTAINS(sr.error_message, "duplicate phc_descr");
@@ -92,7 +92,7 @@ TEST(sem_match_descr_exhaustive_pass) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT_EQ(sr.error, 0);
 
     semantic_result_free(&sr);
@@ -109,7 +109,7 @@ TEST(sem_match_descr_missing_variant) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
     ASSERT_STR_CONTAINS(sr.error_message, "Tri");
@@ -127,7 +127,7 @@ TEST(sem_match_descr_multiple_missing) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
     /* Should mention at least one of the missing variants */
@@ -150,7 +150,7 @@ TEST(sem_match_descr_duplicate_case) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
     ASSERT_STR_CONTAINS(sr.error_message, "duplicate");
@@ -167,7 +167,7 @@ TEST(sem_match_descr_unknown_type) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
     ASSERT_STR_CONTAINS(sr.error_message, "NoSuchType");
@@ -188,7 +188,7 @@ TEST(sem_match_descr_unknown_variant_in_case) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT(sr.error != 0);
     ASSERT_NOT_NULL(sr.error_message);
     /* Should flag 'C' as not a variant of 'AB' */
@@ -207,7 +207,7 @@ TEST(sem_no_match_descr_passes) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT_EQ(sr.error, 0);
 
     semantic_result_free(&sr);
@@ -219,7 +219,7 @@ TEST(sem_passthrough_only) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    SemanticResult sr = analyse(&pr.program);
+    SemanticResult sr = analyse(&pr.program, NULL, 0);
     ASSERT_EQ(sr.error, 0);
 
     semantic_result_free(&sr);
