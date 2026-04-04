@@ -52,6 +52,7 @@ static int load_type_manifest(const char *path,
         fprintf(stderr, "phc: error: cannot open manifest '%s'\n", path);
         return 0;
     }
+    int initial_count = *count;
     char *line = NULL;
     size_t line_cap = 0;
     while (getline(&line, &line_cap, f) != -1) {
@@ -104,6 +105,10 @@ static int load_type_manifest(const char *path,
     }
     free(line);
     fclose(f);
+    if (*count == initial_count) {
+        fprintf(stderr, "phc: error: no types found in manifest '%s'\n", path);
+        return 0;
+    }
     return 1;
 }
 
