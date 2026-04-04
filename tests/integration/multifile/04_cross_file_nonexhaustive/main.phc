@@ -1,0 +1,10 @@
+#include "shapes.h"
+
+void handle(Shape s) {
+    phc_match(Shape, s) {
+        case Circle: {
+        } break;
+        case Rectangle: {
+        } break;
+    }
+}

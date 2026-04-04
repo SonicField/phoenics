@@ -1,0 +1,8 @@
+/* main.phc defines Shape locally AND imports it via manifest.
+   This must error — duplicate type. */
+
+phc_descr Shape {
+    Triangle { double a; double b; double c; }
+};
+
+int main(void) { return 0; }

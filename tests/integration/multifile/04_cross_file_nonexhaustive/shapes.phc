@@ -1,0 +1,5 @@
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; },
+    Triangle { double a; double b; double c; }
+};

@@ -1,0 +1,6 @@
+phc_descr Shape { Circle { double r; } };
+phc_match(Shape, s) { case Circle: {} }
+nested "phc_descr" in escaped string
+10 20 30 40 50
+phc_descr
+phc_match

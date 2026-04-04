@@ -1,0 +1,10 @@
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+
+phc_descr Color {
+    Red {},
+    Green {},
+    Blue { int intensity; }
+};

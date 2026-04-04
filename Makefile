@@ -13,7 +13,7 @@ LIB_OBJS = $(filter-out $(BUILDDIR)/main.o,$(OBJS))
 UNIT_SRCS = $(wildcard $(TESTDIR)/unit/*.c)
 UNIT_BINS = $(patsubst $(TESTDIR)/unit/%.c,$(BUILDDIR)/test_%,$(UNIT_SRCS))
 
-.PHONY: all clean test test-unit test-integration test-selfhost test-pipeline test-roundtrip
+.PHONY: all clean test test-unit test-integration test-multifile test-fidelity test-selfhost test-pipeline test-roundtrip
 
 all: $(BUILDDIR)/phc
 
@@ -30,7 +30,7 @@ $(BUILDDIR)/phc: $(OBJS) | $(BUILDDIR)
 $(BUILDDIR)/test_%: $(TESTDIR)/unit/%.c $(LIB_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR) $< $(LIB_OBJS) -o $@
 
-test: test-unit test-integration test-selfhost test-pipeline
+test: test-unit test-integration test-fidelity test-selfhost test-pipeline
 
 test-unit: $(UNIT_BINS)
 	@echo "=== Unit Tests ==="
@@ -45,6 +45,16 @@ test-unit: $(UNIT_BINS)
 test-integration: $(BUILDDIR)/phc
 	@echo "=== Integration Tests ==="
 	@$(TESTDIR)/integration/run_tests.sh $(BUILDDIR)/phc
+
+# Passthrough fidelity edge cases (empty, CRLF, no-newline, etc.)
+test-fidelity: $(BUILDDIR)/phc
+	@echo "=== Passthrough Fidelity Tests ==="
+	@$(TESTDIR)/integration/passthrough_fidelity_test.sh $(BUILDDIR)/phc
+
+# Multi-file integration tests (v2 type manifests)
+test-multifile: $(BUILDDIR)/phc
+	@echo "=== Multi-File Integration Tests ==="
+	@$(TESTDIR)/integration/multifile_test.sh $(BUILDDIR)/phc
 
 # Self-hosting: phc must pass through its own source unchanged
 test-selfhost: $(BUILDDIR)/phc

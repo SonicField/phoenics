@@ -1,0 +1,45 @@
+#include <stdio.h>
+
+phc_descr Value {
+    IntPtr { int **pp; },
+    ConstStr { const char *s; },
+    BigNum { unsigned long long n; },
+    Pair { int x; int y; }
+};
+
+int main(void) {
+    /* Test pointer-to-pointer */
+    int val = 42;
+    int *p = &val;
+    Value v1 = Value_mk_IntPtr(&p);
+    phc_match(Value, v1) {
+        case IntPtr: { printf("intptr: %d\n", **v1.IntPtr.pp); } break;
+        case ConstStr: { printf("str: %s\n", v1.ConstStr.s); } break;
+        case BigNum: { printf("big: %llu\n", v1.BigNum.n); } break;
+        case Pair: { printf("pair: %d,%d\n", v1.Pair.x, v1.Pair.y); } break;
+    }
+
+    /* Test const char * */
+    Value v2 = Value_mk_ConstStr("hello");
+    phc_match(Value, v2) {
+        case IntPtr: { printf("intptr\n"); } break;
+        case ConstStr: { printf("str: %s\n", v2.ConstStr.s); } break;
+        case BigNum: { printf("big\n"); } break;
+        case Pair: { printf("pair\n"); } break;
+    }
+
+    /* Test unsigned long long */
+    Value v3 = Value_mk_BigNum(18446744073709551615ULL);
+    phc_match(Value, v3) {
+        case IntPtr: { printf("intptr\n"); } break;
+        case ConstStr: { printf("str\n"); } break;
+        case BigNum: { printf("big: %llu\n", v3.BigNum.n); } break;
+        case Pair: { printf("pair\n"); } break;
+    }
+
+    /* Test accessor on correct variant */
+    Value_Pair_t pair = Value_as_Pair(Value_mk_Pair(10, 20));
+    printf("pair accessor: %d,%d\n", pair.x, pair.y);
+
+    return 0;
+}
