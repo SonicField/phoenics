@@ -1,0 +1,17 @@
+#include <stdio.h>
+
+phc_descr Pair {
+    I { int i; },
+    C { char c; },
+    P { double *p; }
+};
+
+int main(void) {
+    Pair a = Pair_mk_I(99);
+    phc_match(Pair, a) {
+        case I(i): { printf("i=%d\n", i); } break;
+        case C(c): { printf("c=%c\n", c); } break;
+        case P: { printf("p\n"); } break;
+    }
+    return 0;
+}
