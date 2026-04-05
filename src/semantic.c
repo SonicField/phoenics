@@ -69,6 +69,30 @@ SemanticResult analyse(const Program *prog,
         }
     }
 
+    /* Check for C keyword collisions in field names */
+    static const char *c_keywords[] = {
+        "auto", "break", "case", "char", "const", "continue", "default",
+        "do", "double", "else", "enum", "extern", "float", "for", "goto",
+        "if", "inline", "int", "long", "register", "restrict", "return",
+        "short", "signed", "sizeof", "static", "struct", "switch",
+        "typedef", "union", "unsigned", "void", "volatile", "while", NULL
+    };
+    for (int i = 0; i < prog->descr_count && !sr.error; i++) {
+        const DescrDecl *d = &prog->descrs[i];
+        if (d->variant_count < 0) continue;
+        for (int j = 0; j < d->variant_count && !sr.error; j++) {
+            for (int k = 0; k < d->variants[j].field_count && !sr.error; k++) {
+                const char *fname = d->variants[j].fields[k].field_name;
+                for (const char **kw = c_keywords; *kw; kw++) {
+                    if (strcmp(fname, *kw) == 0) {
+                        sem_error(&sr, "field name '%s' in variant '%s' of '%s' is a C keyword",
+                                  fname, d->variants[j].name, d->name);
+                    }
+                }
+            }
+        }
+    }
+
     /* Check for duplicate variant names within each descr */
     for (int i = 0; i < prog->descr_count && !sr.error; i++) {
         const DescrDecl *d = &prog->descrs[i];

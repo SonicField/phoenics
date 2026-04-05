@@ -584,9 +584,24 @@ ParseResult parse(const char *source) {
             add_passthrough(&p, p.passthrough_start, p.cur.pos);
             size_t ret_end = p.cur.pos + p.cur.length; /* after 'return' */
 
-            /* Find the ; in source text (return expression ends at ;) */
+            /* Find the ; at depth 0 (skip ; inside braces/parens) */
             size_t semi = ret_end;
-            while (semi < p.source_len && p.source[semi] != ';') semi++;
+            int depth = 0;
+            while (semi < p.source_len) {
+                char ch = p.source[semi];
+                if (ch == '(' || ch == '{') depth++;
+                else if (ch == ')' || ch == '}') depth--;
+                else if (ch == ';' && depth == 0) break;
+                /* Skip string literals */
+                else if (ch == '"') {
+                    semi++;
+                    while (semi < p.source_len && p.source[semi] != '"') {
+                        if (p.source[semi] == '\\') semi++;
+                        semi++;
+                    }
+                }
+                semi++;
+            }
 
             /* Extract expression (between 'return' and ';'), trimmed */
             size_t expr_s = ret_end;
