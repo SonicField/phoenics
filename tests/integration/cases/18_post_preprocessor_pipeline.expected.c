@@ -60,10 +60,10 @@ int main(void) {
 
     /* Test exhaustive match */
     switch (r.tag) {
-        case Result_Ok: { printf("match ok: %d\n", r.Ok.value); } break;
-        case Result_Err: { printf("match err: %s\n", r.Err.msg); } break;
-            default: break;
-    }
+    case Result_Ok: { printf("match ok: %d\n", r.Ok.value); } break;
+    case Result_Err: { printf("match err: %s\n", r.Err.msg); } break;
+    default: break;
+}
 #line 24
 
     return 0;

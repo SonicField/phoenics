@@ -51,16 +51,14 @@ static inline Val_Str_t Val_as_Str(Val v) {
 int main(void) {
     Val v = Val_mk_Int(99);
     switch (v.tag) {
-        /* Handle integer values */
-        case Val_Int: {
+    case Val_Int: {
             printf("int: %d\n", v.Int.n);
         } break;
-        // Handle string values
-        case Val_Str: {
+    case Val_Str: {
             printf("str: %s\n", v.Str.s);
         } break;
-            default: break;
-    }
+    default: break;
+}
 #line 20
     return 0;
 }

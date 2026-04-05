@@ -32,7 +32,7 @@ static int emit_type_manifest(const char *path, const Program *prog) {
         fprintf(stderr, "phc: error: cannot open '%s' for writing\n", path);
         return 0;
     }
-    fprintf(f, "# phc type manifest — machine generated, do not edit\n");
+    fprintf(f, "# phc type manifest v1 — machine generated, do not edit\n");
     for (int i = 0; i < prog->descr_count; i++) {
         const DescrDecl *d = &prog->descrs[i];
         fprintf(f, "descr %s", d->name);

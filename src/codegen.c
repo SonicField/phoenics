@@ -95,70 +95,18 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
 
 /* --- match_descr codegen --- */
 
-static void emit_match_descr(Buffer *buf, const Program *prog,
-                              const MatchDescr *m) {
-    const char *src = prog->source;
-
-    /* Emit "switch (expr.tag)" replacing "match_descr(Type, expr)" */
+static void emit_match_descr(Buffer *buf, const MatchDescr *m) {
     buf_append(buf, "switch (");
     buf_append(buf, m->expr_text);
-    buf_append(buf, ".tag)");
+    buf_append(buf, ".tag) {\n");
 
-    /* Copy body from source with variant name replacements.
-     * Copy from header_end_pos to rbrace_pos, replacing case variant names. */
-    size_t pos = m->header_end_pos;
     for (int i = 0; i < m->case_count; i++) {
-        /* Copy from current pos to the variant name */
-        buf_append_n(buf, src + pos, m->cases[i].name_pos - pos);
-        /* Emit prefixed variant name */
-        buf_printf(buf, "%s_%s", m->type_name, m->cases[i].variant_name);
-        /* Skip past original variant name */
-        pos = m->cases[i].name_pos + m->cases[i].name_len;
+        buf_printf(buf, "    case %s_%s: %s\n",
+                   m->type_name, m->cases[i].variant_name,
+                   m->cases[i].body_text);
     }
 
-    /* Copy from after last case variant name to just before the closing }.
-     * Split at the last \n so we can insert default: break; before the
-     * closing brace's indentation. Clamp searches to within the match body
-     * (lbrace_pos+1) to avoid walking into preceding source on single-line input. */
-    size_t body_lower = m->lbrace_pos + 1;
-    size_t last_nl = m->rbrace_pos;
-    while (last_nl > body_lower && src[last_nl - 1] != '\n') last_nl--;
-
-    int has_newline = (last_nl > body_lower);
-
-    if (has_newline) {
-        /* Multi-line: copy body up to last newline */
-        buf_append_n(buf, src + pos, last_nl - pos);
-    } else {
-        /* Single-line: copy all body text before closing } */
-        buf_append_n(buf, src + pos, m->rbrace_pos - pos);
-    }
-
-    /* Insert "default: break;" with same indentation as case labels */
-    if (m->case_count > 0) {
-        size_t first_name = m->cases[0].name_pos;
-        size_t case_kw = first_name;
-        while (case_kw > body_lower && src[case_kw - 1] == ' ') case_kw--;
-        if (case_kw >= 4) case_kw -= 4;
-
-        /* Find line start before case keyword, clamped to body */
-        size_t line_start = case_kw;
-        while (line_start > body_lower && src[line_start - 1] != '\n') line_start--;
-
-        if (has_newline) {
-            buf_append_n(buf, src + line_start, case_kw - line_start);
-            buf_append(buf, "    default: break;\n");
-        } else {
-            buf_append(buf, " default: break; ");
-        }
-    }
-
-    /* Emit closing brace with its original indentation */
-    if (has_newline) {
-        size_t close_line = m->rbrace_pos;
-        while (close_line > body_lower && src[close_line - 1] != '\n') close_line--;
-        buf_append_n(buf, src + close_line, m->rbrace_pos - close_line);
-    }
+    buf_append(buf, "    default: break;\n");
     buf_append(buf, "}");
 }
 
@@ -187,7 +135,7 @@ char *codegen(const Program *prog) {
             buf_printf(&buf, "\n#line %d", prog->descrs[c->descr_index].end_line);
             break;
         case CHUNK_MATCH_DESCR:
-            emit_match_descr(&buf, prog, &c->match);
+            emit_match_descr(&buf, &c->match);
             buf_printf(&buf, "\n#line %d", c->match.end_line);
             break;
         }

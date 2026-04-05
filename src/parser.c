@@ -140,6 +140,34 @@ static int parse_field(Parser *p, Field *f) {
     return 1;
 }
 
+/* --- cleanup helpers --- */
+
+static void free_variant_contents(Variant *v) {
+    for (int i = 0; i < v->field_count; i++) {
+        free(v->fields[i].type_name);
+        free(v->fields[i].field_name);
+    }
+    free(v->fields);
+    free(v->name);
+}
+
+static void free_descr_contents(DescrDecl *d) {
+    for (int i = 0; i < d->variant_count; i++)
+        free_variant_contents(&d->variants[i]);
+    free(d->variants);
+    free(d->name);
+}
+
+static void free_match_contents(MatchDescr *m) {
+    for (int i = 0; i < m->case_count; i++) {
+        free(m->cases[i].variant_name);
+        free(m->cases[i].body_text);
+    }
+    free(m->cases);
+    free(m->type_name);
+    free(m->expr_text);
+}
+
 /* --- descr parsing --- */
 
 static int parse_variant(Parser *p, Variant *v) {
@@ -152,16 +180,16 @@ static int parse_variant(Parser *p, Variant *v) {
     v->field_count = 0;
     next_token(p);
 
-    if (!expect(p, TOK_LBRACE)) return 0;
+    if (!expect(p, TOK_LBRACE)) { free(v->name); return 0; }
 
     int field_cap = 0;
     while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
         Field f;
-        if (!parse_field(p, &f)) return 0;
+        if (!parse_field(p, &f)) { free_variant_contents(v); return 0; }
         DA_PUSH(v->fields, v->field_count, field_cap, f);
     }
 
-    if (!expect(p, TOK_RBRACE)) return 0;
+    if (!expect(p, TOK_RBRACE)) { free_variant_contents(v); return 0; }
     return 1;
 }
 
@@ -194,20 +222,20 @@ static int parse_descr(Parser *p) {
         }
         first = 0;
         Variant v;
-        if (!parse_variant(p, &v)) { free(d.name); return 0; }
+        if (!parse_variant(p, &v)) { free_descr_contents(&d); return 0; }
         DA_PUSH(d.variants, d.variant_count, variant_cap, v);
     }
 
     if (d.variant_count == 0) {
         parser_error(p, "descr '%s' must have at least one variant", d.name);
-        free(d.name);
+        free_descr_contents(&d);
         return 0;
     }
 
-    if (!expect(p, TOK_RBRACE)) { free(d.name); return 0; }
+    if (!expect(p, TOK_RBRACE)) { free_descr_contents(&d); return 0; }
     if (p->cur.type != TOK_SEMICOLON) {
         parser_error(p, "expected ';' after descr declaration");
-        free(d.name);
+        free_descr_contents(&d);
         return 0;
     }
     size_t end_pos = p->cur.pos + 1;
@@ -232,7 +260,7 @@ static int parse_descr(Parser *p) {
 static int parse_match_descr(Parser *p, size_t keyword_pos) {
     MatchDescr m;
     memset(&m, 0, sizeof(m));
-    m.start_pos = keyword_pos;
+    (void)keyword_pos;
 
     if (p->cur.type != TOK_LPAREN) {
         parser_error(p, "expected '(' after 'match_descr'");
@@ -278,7 +306,6 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
         free(m.expr_text);
         return 0;
     }
-    m.header_end_pos = p->cur.pos + 1;
     next_token(p);
 
     if (p->cur.type != TOK_LBRACE) {
@@ -287,7 +314,6 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
         free(m.expr_text);
         return 0;
     }
-    m.lbrace_pos = p->cur.pos;
     next_token(p);
 
     /* Parse cases (skip comments/other tokens between cases) */
@@ -298,23 +324,19 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
 
         if (p->cur.type != TOK_IDENT) {
             parser_error(p, "expected variant name after 'case' in match_descr");
-            free(m.type_name);
-            free(m.expr_text);
+            free_match_contents(&m);
             return 0;
         }
 
         MatchCase mc;
         memset(&mc, 0, sizeof(mc));
         mc.variant_name = strndup(p->cur.value, p->cur.length);
-        mc.name_pos = p->cur.pos;
-        mc.name_len = p->cur.length;
         next_token(p);
 
         if (p->cur.type != TOK_COLON) {
             parser_error(p, "expected ':' after variant name in match_descr case");
             free(mc.variant_name);
-            free(m.type_name);
-            free(m.expr_text);
+            free_match_contents(&m);
             return 0;
         }
         next_token(p);
@@ -325,8 +347,7 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
         if (p->cur.type != TOK_LBRACE) {
             parser_error(p, "expected '{' to open case body in match_descr");
             free(mc.variant_name);
-            free(m.type_name);
-            free(m.expr_text);
+            free_match_contents(&m);
             return 0;
         }
 
@@ -366,11 +387,9 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
 
     if (p->cur.type != TOK_RBRACE) {
         parser_error(p, "expected '}' to close match_descr");
-        free(m.type_name);
-        free(m.expr_text);
+        free_match_contents(&m);
         return 0;
     }
-    m.rbrace_pos = p->cur.pos;
     m.end_pos = p->cur.pos + 1;
     next_token(p);
     m.end_line = p->cur.line;

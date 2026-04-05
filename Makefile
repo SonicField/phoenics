@@ -84,5 +84,11 @@ test-self:
 	@$(CC) $(CFLAGS) -Wno-unused-function -o $(BUILDDIR)/test_self $(TESTDIR)/test_self.c
 	@$(BUILDDIR)/test_self
 
+# AddressSanitizer build: catches use-after-free, buffer overflow, memory leaks
+# AddressSanitizer build: catches use-after-free, buffer overflow, memory leaks
+test-asan: clean
+	@echo "=== ASan Build + Test ==="
+	$(MAKE) test CFLAGS="-std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -pedantic -g -fsanitize=address -fno-omit-frame-pointer"
+
 clean:
 	rm -rf $(BUILDDIR)

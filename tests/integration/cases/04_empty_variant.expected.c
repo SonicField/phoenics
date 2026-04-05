@@ -53,14 +53,14 @@ static inline Result_Err_t Result_as_Err(Result v) {
 int main(void) {
     Result r = Result_mk_Ok(42);
     switch (r.tag) {
-        case Result_Ok: {
+    case Result_Ok: {
             printf("ok: %d\n", r.Ok.value);
         } break;
-        case Result_Err: {
+    case Result_Err: {
             printf("err %d: %s\n", r.Err.code, r.Err.message);
         } break;
-            default: break;
-    }
+    default: break;
+}
 #line 18
     return 0;
 }

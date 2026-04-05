@@ -132,18 +132,18 @@ int main(void) {
     Color c = Color_mk_Red();
     Value v = Value_mk_Integer(42);
     switch (c.tag) {
-        case Color_Red:   { printf("red\n"); } break;
-        case Color_Green: { printf("green\n"); } break;
-        case Color_Blue:  { printf("blue\n"); } break;
-            default: break;
-    }
+    case Color_Red: { printf("red\n"); } break;
+    case Color_Green: { printf("green\n"); } break;
+    case Color_Blue: { printf("blue\n"); } break;
+    default: break;
+}
 #line 23
     switch (v.tag) {
-        case Value_Integer: { printf("int: %d\n", v.Integer.n); } break;
-        case Value_Float:   { printf("float: %f\n", v.Float.f); } break;
-        case Value_String:  { printf("string: %s\n", v.String.s); } break;
-            default: break;
-    }
+    case Value_Integer: { printf("int: %d\n", v.Integer.n); } break;
+    case Value_Float: { printf("float: %f\n", v.Float.f); } break;
+    case Value_String: { printf("string: %s\n", v.String.s); } break;
+    default: break;
+}
 #line 28
     return 0;
 }

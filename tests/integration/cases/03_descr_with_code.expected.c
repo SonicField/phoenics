@@ -50,14 +50,14 @@ static inline Option_int_None_t Option_int_as_None(Option_int v) {
 int main(void) {
     Option_int x = Option_int_mk_Some(42);
     switch (x.tag) {
-        case Option_int_Some: {
+    case Option_int_Some: {
             printf("got %d\n", x.Some.value);
         } break;
-        case Option_int_None: {
+    case Option_int_None: {
             printf("nothing\n");
         } break;
-            default: break;
-    }
+    default: break;
+}
 #line 18
     return 0;
 }

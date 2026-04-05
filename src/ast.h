@@ -23,9 +23,7 @@ typedef struct {
 
 typedef struct {
     char *variant_name;
-    char *body_text;    /* raw text of case body (for inspection/testing) */
-    size_t name_pos;    /* byte offset of variant name in source */
-    size_t name_len;    /* length of variant name */
+    char *body_text;    /* raw text of case body including braces and optional break */
 } MatchCase;
 
 typedef struct {
@@ -33,11 +31,7 @@ typedef struct {
     char *expr_text;
     MatchCase *cases;
     int case_count;
-    size_t start_pos;       /* position of 'match_descr' keyword */
-    size_t header_end_pos;  /* position after ')' */
-    size_t lbrace_pos;      /* position of opening '{' */
-    size_t rbrace_pos;      /* position of closing '}' */
-    size_t end_pos;         /* position after closing '}' */
+    size_t end_pos;         /* position after closing '}' (for passthrough tracking) */
     int end_line;           /* source line after closing '}' */
 } MatchDescr;
 

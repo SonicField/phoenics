@@ -53,14 +53,14 @@ static inline Shape_Rectangle_t Shape_as_Rectangle(Shape v) {
 int main(void) {
     Shape s = Shape_mk_Circle(3.14);
     switch (s.tag) {
-        case Shape_Circle: {
+    case Shape_Circle: {
             printf("circle r=%g\n", s.Circle.radius);
         } break;
-        case Shape_Rectangle: {
+    case Shape_Rectangle: {
             printf("rect %gx%g\n", s.Rectangle.width, s.Rectangle.height);
         } break;
-            default: break;
-    }
+    default: break;
+}
 #line 18
     return 0;
 }

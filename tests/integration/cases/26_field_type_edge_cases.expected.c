@@ -92,34 +92,34 @@ int main(void) {
     int *p = &val;
     Value v1 = Value_mk_IntPtr(&p);
     switch (v1.tag) {
-        case Value_IntPtr: { printf("intptr: %d\n", **v1.IntPtr.pp); } break;
-        case Value_ConstStr: { printf("str: %s\n", v1.ConstStr.s); } break;
-        case Value_BigNum: { printf("big: %llu\n", v1.BigNum.n); } break;
-        case Value_Pair: { printf("pair: %d,%d\n", v1.Pair.x, v1.Pair.y); } break;
-            default: break;
-    }
+    case Value_IntPtr: { printf("intptr: %d\n", **v1.IntPtr.pp); } break;
+    case Value_ConstStr: { printf("str: %s\n", v1.ConstStr.s); } break;
+    case Value_BigNum: { printf("big: %llu\n", v1.BigNum.n); } break;
+    case Value_Pair: { printf("pair: %d,%d\n", v1.Pair.x, v1.Pair.y); } break;
+    default: break;
+}
 #line 22
 
     /* Test const char * */
     Value v2 = Value_mk_ConstStr("hello");
     switch (v2.tag) {
-        case Value_IntPtr: { printf("intptr\n"); } break;
-        case Value_ConstStr: { printf("str: %s\n", v2.ConstStr.s); } break;
-        case Value_BigNum: { printf("big\n"); } break;
-        case Value_Pair: { printf("pair\n"); } break;
-            default: break;
-    }
+    case Value_IntPtr: { printf("intptr\n"); } break;
+    case Value_ConstStr: { printf("str: %s\n", v2.ConstStr.s); } break;
+    case Value_BigNum: { printf("big\n"); } break;
+    case Value_Pair: { printf("pair\n"); } break;
+    default: break;
+}
 #line 31
 
     /* Test unsigned long long */
     Value v3 = Value_mk_BigNum(18446744073709551615ULL);
     switch (v3.tag) {
-        case Value_IntPtr: { printf("intptr\n"); } break;
-        case Value_ConstStr: { printf("str\n"); } break;
-        case Value_BigNum: { printf("big: %llu\n", v3.BigNum.n); } break;
-        case Value_Pair: { printf("pair\n"); } break;
-            default: break;
-    }
+    case Value_IntPtr: { printf("intptr\n"); } break;
+    case Value_ConstStr: { printf("str\n"); } break;
+    case Value_BigNum: { printf("big: %llu\n", v3.BigNum.n); } break;
+    case Value_Pair: { printf("pair\n"); } break;
+    default: break;
+}
 #line 40
 
     /* Test accessor on correct variant */
