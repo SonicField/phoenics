@@ -243,7 +243,13 @@ static int parse_descr(Parser *p) {
     }
     size_t end_pos = p->cur.pos + 1;
     next_token(p);
-    d.end_line = p->cur.line + 1;
+    if (p->lex.marker_seen) {
+        d.end_line = p->cur.orig_line + 1;
+        d.end_file = strndup(p->lex.orig_file, p->lex.orig_file_len);
+    } else {
+        d.end_line = p->cur.line + 1;
+        d.end_file = NULL;
+    }
 
     int idx = p->descr_count;
     DA_PUSH(p->descrs, p->descr_count, p->descr_cap, d);
@@ -426,7 +432,13 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
     }
     m.end_pos = p->cur.pos + 1;
     next_token(p);
-    m.end_line = p->cur.line;
+    if (p->lex.marker_seen) {
+        m.end_line = p->cur.orig_line;
+        m.end_file = strndup(p->lex.orig_file, p->lex.orig_file_len);
+    } else {
+        m.end_line = p->cur.line;
+        m.end_file = NULL;
+    }
 
     Chunk c;
     memset(&c, 0, sizeof(c));
@@ -494,6 +506,7 @@ void parse_result_free(ParseResult *result) {
             free(d->variants[j].fields);
         }
         free(d->variants);
+        free(d->end_file);
     }
     free(result->program.descrs);
     for (int i = 0; i < result->program.chunk_count; i++) {
@@ -502,6 +515,7 @@ void parse_result_free(ParseResult *result) {
             MatchDescr *m = &c->match;
             free(m->type_name);
             free(m->expr_text);
+            free(m->end_file);
             for (int j = 0; j < m->case_count; j++) {
                 free(m->cases[j].variant_name);
                 free(m->cases[j].body_text);

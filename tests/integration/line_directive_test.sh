@@ -107,17 +107,11 @@ for input_file in "$CASES_DIR"/*.phc; do
         run_test "$input_file" "$expected_line" "direct" "$base"
     fi
 
-    # Pipeline-mode test (non-blocking — known limitation until V3 P2)
+    # Pipeline-mode test
     pipeline_line_file="$CASES_DIR/${base}.pipeline_expected_line"
     if [ -f "$pipeline_line_file" ]; then
         expected_line="$(cat "$pipeline_line_file" | tr -d '[:space:]')"
-        old_fail=$FAIL
         run_test "$input_file" "$expected_line" "pipeline" "$base"
-        if [ $FAIL -gt $old_fail ]; then
-            # Pipeline failure is expected until P2 — don't block the gate
-            FAIL=$old_fail
-            PIPELINE_KNOWN=$((${PIPELINE_KNOWN:-0} + 1))
-        fi
     fi
 done
 

@@ -19,6 +19,7 @@ typedef struct {
     Variant *variants;
     int variant_count;
     int end_line;       /* source line after closing ';' */
+    char *end_file;     /* source filename (NULL in direct mode) */
 } DescrDecl;
 
 typedef struct {
@@ -35,6 +36,7 @@ typedef struct {
     int case_count;
     size_t end_pos;         /* position after closing '}' (for passthrough tracking) */
     int end_line;           /* source line after closing '}' */
+    char *end_file;         /* source filename (NULL in direct mode) */
 } MatchDescr;
 
 typedef enum {

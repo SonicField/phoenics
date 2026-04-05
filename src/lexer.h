@@ -33,6 +33,7 @@ typedef struct {
     int line;
     int col;
     size_t pos;          /* byte offset in source */
+    int orig_line;       /* original source line (from preprocessor markers) */
 } Token;
 
 typedef struct {
@@ -44,6 +45,11 @@ typedef struct {
     LexerMode mode;
     int brace_depth;     /* tracked in STRUCT mode */
     int depth_zero_seen; /* flag: closing } brought depth to 0 */
+    /* Preprocessor marker tracking (pipeline mode) */
+    int orig_line;       /* original source line from last # marker */
+    const char *orig_file; /* pointer into source for filename */
+    size_t orig_file_len;
+    int marker_seen;     /* nonzero if any preprocessor marker was seen */
 } Lexer;
 
 void  lexer_init(Lexer *lex, const char *source);

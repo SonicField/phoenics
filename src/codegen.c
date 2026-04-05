@@ -191,14 +191,22 @@ char *codegen(const Program *prog,
             buf_append_n(&buf, prog->source + c->passthrough.start,
                          c->passthrough.end - c->passthrough.start);
             break;
-        case CHUNK_DESCR:
-            emit_descr(&buf, &prog->descrs[c->descr_index]);
-            buf_printf(&buf, "\n#line %d", prog->descrs[c->descr_index].end_line);
+        case CHUNK_DESCR: {
+            const DescrDecl *d = &prog->descrs[c->descr_index];
+            emit_descr(&buf, d);
+            if (d->end_file)
+                buf_printf(&buf, "\n#line %d \"%s\"", d->end_line, d->end_file);
+            else
+                buf_printf(&buf, "\n#line %d", d->end_line);
             break;
+        }
         case CHUNK_MATCH_DESCR:
             emit_match_descr(&buf, &c->match, prog->descrs, prog->descr_count,
                             external_types, external_type_count);
-            buf_printf(&buf, "\n#line %d", c->match.end_line);
+            if (c->match.end_file)
+                buf_printf(&buf, "\n#line %d \"%s\"", c->match.end_line, c->match.end_file);
+            else
+                buf_printf(&buf, "\n#line %d", c->match.end_line);
             break;
         }
     }
