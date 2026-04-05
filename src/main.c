@@ -115,13 +115,18 @@ static int load_type_manifest(const char *path,
             char *variant_name = strtok_r(NULL, " \t\n", &saveptr);
             if (!type_name || !variant_name) continue;
 
-            /* Collect remaining tokens: all but last are type, last is field name */
-            char *tokens[64];
+            /* Collect remaining tokens dynamically */
+            char **tokens = NULL;
             int ntok = 0;
-            while ((tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL && ntok < 64) {
+            int tok_cap = 0;
+            while ((tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
+                if (ntok >= tok_cap) {
+                    tok_cap = tok_cap ? tok_cap * 2 : 8;
+                    tokens = realloc(tokens, sizeof(char *) * (size_t)tok_cap);
+                }
                 tokens[ntok++] = tok;
             }
-            if (ntok < 2) continue; /* need at least type + name */
+            if (ntok < 2) { free(tokens); continue; } /* need at least type + name */
 
             /* Find the DescrType for this type_name */
             DescrType *dt = NULL;
@@ -131,7 +136,7 @@ static int load_type_manifest(const char *path,
                     break;
                 }
             }
-            if (!dt) continue;
+            if (!dt) { free(tokens); continue; }
 
             /* Find variant index */
             int vi = -1;
@@ -141,7 +146,7 @@ static int load_type_manifest(const char *path,
                     break;
                 }
             }
-            if (vi < 0) continue;
+            if (vi < 0) { free(tokens); continue; }
 
             /* Allocate variant_fields/counts arrays if needed */
             if (!dt->variant_fields) {
@@ -149,8 +154,13 @@ static int load_type_manifest(const char *path,
                 dt->variant_field_counts = calloc((size_t)dt->variant_count, sizeof(int));
             }
 
-            /* Build type string from tokens[0..ntok-2], field name is tokens[ntok-1] */
-            char type_buf[256] = {0};
+            /* Build type string dynamically from tokens[0..ntok-2] */
+            size_t type_len = 0;
+            for (int i = 0; i < ntok - 1; i++) {
+                type_len += strlen(tokens[i]) + 1; /* +1 for space or null */
+            }
+            char *type_buf = malloc(type_len + 1);
+            type_buf[0] = '\0';
             for (int i = 0; i < ntok - 1; i++) {
                 if (i > 0) strcat(type_buf, " ");
                 strcat(type_buf, tokens[i]);
@@ -159,9 +169,10 @@ static int load_type_manifest(const char *path,
             int fc = dt->variant_field_counts[vi];
             dt->variant_fields[vi] = realloc(dt->variant_fields[vi],
                                               sizeof(Field) * (size_t)(fc + 1));
-            dt->variant_fields[vi][fc].type_name = strdup(type_buf);
+            dt->variant_fields[vi][fc].type_name = type_buf; /* takes ownership */
             dt->variant_fields[vi][fc].field_name = strdup(tokens[ntok - 1]);
             dt->variant_field_counts[vi] = fc + 1;
+            free(tokens);
 
         } else {
             continue; /* Skip unknown keywords for forward-compatibility */
