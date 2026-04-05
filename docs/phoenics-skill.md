@@ -29,6 +29,19 @@ phc_descr TypeName {
 };
 ```
 
+Supports all C field types: pointers, function pointers (`void (*cb)(int)`), arrays (`int data[4]`), multi-word types (`unsigned long long`).
+
+### Forward declare (for recursive types)
+
+```c
+phc_descr List;
+
+phc_descr List {
+    Cons { int head; List *tail; },
+    Nil {}
+};
+```
+
 ### Construct
 
 ```c
@@ -39,49 +52,55 @@ TypeName w = TypeName_mk_Variant3();
 ### Access safely
 
 ```c
-field_type x = TypeName_as_Variant1(v).field1;  // asserts tag at runtime
+TypeName_Variant1_t data = TypeName_as_Variant1(v);  // aborts if wrong tag
+field_type x = data.field1;
 ```
 
-### Match exhaustively
+### Match with destructuring
 
 ```c
 phc_match(TypeName, v) {
-    case Variant1: {
-        // use TypeName_as_Variant1(v).field1
+    case Variant1(field1, field2): {
+        // field1 and field2 are local variables
     } break;
-    case Variant2: {
-        // use TypeName_as_Variant2(v).field3
+    case Variant2(field3): {
+        use(field3);
     } break;
     case Variant3: {
-        // no fields
+        // no fields to bind
     } break;
 }
 ```
 
-Every variant must be covered. Missing one is a compile-time error.
+Every variant must be covered. Missing one is a compile-time error. Binding names must match field names.
 
 ### Raw tag access
 
 ```c
 if (v.tag == TypeName_Variant1) { ... }
-assert(v.tag < TypeName__COUNT);
 ```
 
 ## Build
 
 ```bash
-phc < input.phc > output.c        # transpile
-make                                # build phc itself
-make test                           # 98 checks
+phc < input.phc > output.c                         # direct mode
+cc -E input.phc | phc | cc -x c -                   # pipeline mode
+phc --emit-types=types.phc-types < lib.phc > lib.c   # emit manifest
+phc --type-manifest=types.phc-types < main.phc       # use manifest
+make                                                  # build phc itself
+make test                                              # 182 checks, 7 suites
+make test-asan                                         # AddressSanitizer build
 ```
 
 ## Rules
 
-1. `phc_descr` and `phc_match` must be in the same file (v1).
-2. Accessor macros evaluate their argument twice. Simple lvalues only.
-3. Recursive types use pointers: `Expr *left`, not `Expr left`.
+1. `phc_match` requires the type to be declared in the same file or loaded via `--type-manifest`.
+2. Accessor functions call `abort()` on tag mismatch.
+3. Recursive types need a forward declaration and pointer fields.
 4. Every `phc_match` covers all variants. No `default`.
-5. Field types: identifiers, qualifiers, pointers. No function pointers or arrays.
+5. Binding names must match field names exactly. Partial binding is allowed.
+6. Array fields bind as pointers in destructuring.
+7. Nested `phc_descr` is not supported — define types at file scope.
 
 ## Reference
 
