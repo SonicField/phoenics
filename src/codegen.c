@@ -5,16 +5,6 @@
 
 /* --- descr codegen --- */
 
-/* Helper: emit "type name" with correct spacing for pointer types */
-static void emit_type_and_name(Buffer *buf, const char *type, const char *name) {
-    buf_append(buf, type);
-    size_t tlen = strlen(type);
-    if (tlen > 0 && type[tlen - 1] != '*') {
-        buf_append(buf, " ");
-    }
-    buf_append(buf, name);
-}
-
 static void emit_descr(Buffer *buf, const DescrDecl *d) {
     /* Tag enum */
     buf_printf(buf, "typedef enum {\n");
@@ -33,7 +23,7 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         } else {
             for (int j = 0; j < v->field_count; j++) {
                 buf_append(buf, "    ");
-                emit_type_and_name(buf, v->fields[j].type_name, v->fields[j].field_name);
+                buf_append(buf, v->fields[j].raw_decl);
                 buf_append(buf, ";\n");
             }
         }
@@ -57,12 +47,21 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         buf_append(buf, "\n");
         buf_printf(buf, "static inline %s %s_mk_%s(", d->name, d->name, v->name);
 
-        if (v->field_count == 0) {
+        /* Count non-array fields for constructor params */
+        int param_count = 0;
+        for (int j = 0; j < v->field_count; j++) {
+            if (!v->fields[j].is_array) param_count++;
+        }
+
+        if (param_count == 0) {
             buf_append(buf, "void");
         } else {
+            int first = 1;
             for (int j = 0; j < v->field_count; j++) {
-                if (j > 0) buf_append(buf, ", ");
-                emit_type_and_name(buf, v->fields[j].type_name, v->fields[j].field_name);
+                if (v->fields[j].is_array) continue;
+                if (!first) buf_append(buf, ", ");
+                first = 0;
+                buf_append(buf, v->fields[j].raw_decl);
             }
         }
 
@@ -70,6 +69,7 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         buf_printf(buf, "    %s _v;\n", d->name);
         buf_printf(buf, "    _v.tag = %s_%s;\n", d->name, v->name);
         for (int j = 0; j < v->field_count; j++) {
+            if (v->fields[j].is_array) continue;
             buf_printf(buf, "    _v.%s.%s = %s;\n",
                        v->name, v->fields[j].field_name, v->fields[j].field_name);
         }

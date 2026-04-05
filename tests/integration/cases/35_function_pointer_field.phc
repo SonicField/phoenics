@@ -1,0 +1,21 @@
+#include <stdio.h>
+
+phc_descr Handler {
+    Callback { void (*func)(int); },
+    Direct { int value; }
+};
+
+static void print_it(int x) { printf("called: %d\n", x); }
+
+int main(void) {
+    Handler h = Handler_mk_Callback(print_it);
+    phc_match(Handler, h) {
+        case Callback: {
+            h.Callback.func(42);
+        } break;
+        case Direct: {
+            printf("direct: %d\n", h.Direct.value);
+        } break;
+    }
+    return 0;
+}

@@ -4,8 +4,10 @@
 #include <stddef.h>
 
 typedef struct {
-    char *type_name;
+    char *type_name;    /* reconstructed type (simple types) or NULL (complex) */
     char *field_name;
+    char *raw_decl;     /* full declaration text from source (e.g., "void (*cb)(int)") */
+    int is_array;       /* nonzero if field is an array type */
 } Field;
 
 typedef struct {

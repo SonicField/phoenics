@@ -84,18 +84,17 @@ static void add_passthrough(Parser *p, size_t start, size_t end) {
 /* --- Field parsing --- */
 
 static int parse_field(Parser *p, Field *f) {
+    size_t field_start = p->cur.pos;
     Token tokens[64];
     int count = 0;
 
     while (p->cur.type != TOK_SEMICOLON && p->cur.type != TOK_EOF &&
            p->cur.type != TOK_RBRACE) {
-        if (count >= 64) {
-            parser_error(p, "field declaration too complex");
-            return 0;
-        }
-        tokens[count++] = p->cur;
+        if (count < 64) tokens[count] = p->cur;
+        count++;
         next_token(p);
     }
+    if (count > 64) count = 64;
 
     if (count < 2) {
         parser_error(p, "invalid field declaration: need at least type and name");
@@ -105,38 +104,84 @@ static int parse_field(Parser *p, Field *f) {
         parser_error(p, "expected ';' after field declaration");
         return 0;
     }
+
+    /* Capture raw declaration text (field_start to just before ;) */
+    size_t field_end = p->cur.pos;
+    while (field_end > field_start &&
+           (p->source[field_end - 1] == ' ' || p->source[field_end - 1] == '\t'))
+        field_end--;
+    f->raw_decl = strndup(p->source + field_start, field_end - field_start);
+
     next_token(p);
 
-    int name_idx = count - 1;
-    if (tokens[name_idx].type != TOK_IDENT) {
-        parser_error(p, "expected field name identifier");
+    /* Extract field name with heuristic */
+    int name_idx = -1;
+    f->is_array = 0;
+
+    /* 1. Function pointer: ( * IDENT ) */
+    for (int i = 0; i < count - 2; i++) {
+        if (tokens[i].type == TOK_LPAREN && tokens[i + 1].type == TOK_STAR &&
+            tokens[i + 2].type == TOK_IDENT) {
+            name_idx = i + 2;
+            break;
+        }
+    }
+
+    /* 2. Array: IDENT followed by '[' (TOK_OTHER '[') */
+    if (name_idx < 0) {
+        for (int i = 0; i < count - 1; i++) {
+            if (tokens[i].type == TOK_IDENT && tokens[i + 1].type == TOK_OTHER &&
+                tokens[i + 1].length == 1 && tokens[i + 1].value[0] == '[') {
+                name_idx = i;
+                f->is_array = 1;
+                break;
+            }
+        }
+    }
+
+    /* 3. Simple: last IDENT token */
+    if (name_idx < 0) {
+        for (int i = count - 1; i >= 0; i--) {
+            if (tokens[i].type == TOK_IDENT) { name_idx = i; break; }
+        }
+    }
+
+    if (name_idx < 0) {
+        parser_error(p, "cannot find field name in declaration");
+        free(f->raw_decl);
         return 0;
     }
     f->field_name = strndup(tokens[name_idx].value, tokens[name_idx].length);
 
-    char type_buf[256] = {0};
-    size_t type_len = 0;
+    /* Build type_name for simple types (IDENT/STAR only before name) */
+    int simple = 1;
     for (int i = 0; i < name_idx; i++) {
-        if (tokens[i].type == TOK_STAR) {
-            if (type_len > 0 && type_buf[type_len - 1] != ' ') {
-                type_buf[type_len++] = ' ';
-            }
-            type_buf[type_len++] = '*';
-        } else if (tokens[i].type == TOK_IDENT) {
-            if (type_len > 0 && type_buf[type_len - 1] != '*') {
-                type_buf[type_len++] = ' ';
-            }
-            size_t vlen = tokens[i].length;
-            memcpy(type_buf + type_len, tokens[i].value, vlen);
-            type_len += vlen;
-        } else {
-            parser_error(p, "unexpected token in type");
-            free(f->field_name);
-            return 0;
+        if (tokens[i].type != TOK_IDENT && tokens[i].type != TOK_STAR) {
+            simple = 0;
+            break;
         }
     }
-    type_buf[type_len] = '\0';
-    f->type_name = strdup(type_buf);
+    if (simple && !f->is_array) {
+        size_t type_len = 0;
+        char *type_buf = malloc(256);
+        for (int i = 0; i < name_idx; i++) {
+            if (tokens[i].type == TOK_STAR) {
+                if (type_len > 0 && type_buf[type_len - 1] != ' ')
+                    type_buf[type_len++] = ' ';
+                type_buf[type_len++] = '*';
+            } else {
+                if (type_len > 0 && type_buf[type_len - 1] != '*')
+                    type_buf[type_len++] = ' ';
+                memcpy(type_buf + type_len, tokens[i].value, tokens[i].length);
+                type_len += tokens[i].length;
+            }
+        }
+        type_buf[type_len] = '\0';
+        f->type_name = type_buf;
+    } else {
+        f->type_name = NULL;
+    }
+
     return 1;
 }
 
@@ -146,6 +191,7 @@ static void free_variant_contents(Variant *v) {
     for (int i = 0; i < v->field_count; i++) {
         free(v->fields[i].type_name);
         free(v->fields[i].field_name);
+        free(v->fields[i].raw_decl);
     }
     free(v->fields);
     free(v->name);
@@ -502,6 +548,7 @@ void parse_result_free(ParseResult *result) {
             for (int k = 0; k < d->variants[j].field_count; k++) {
                 free(d->variants[j].fields[k].type_name);
                 free(d->variants[j].fields[k].field_name);
+                free(d->variants[j].fields[k].raw_decl);
             }
             free(d->variants[j].fields);
         }

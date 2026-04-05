@@ -10,7 +10,7 @@ typedef enum {
 } Value_Tag;
 
 typedef struct {
-    int * *pp;
+    int **pp;
 } Value_IntPtr_t;
 
 typedef struct {
@@ -36,7 +36,7 @@ typedef struct {
     };
 } Value;
 
-static inline Value Value_mk_IntPtr(int * *pp) {
+static inline Value Value_mk_IntPtr(int **pp) {
     Value _v;
     _v.tag = Value_IntPtr;
     _v.IntPtr.pp = pp;
