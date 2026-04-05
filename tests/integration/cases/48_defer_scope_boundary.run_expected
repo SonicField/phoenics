@@ -1,0 +1,8 @@
+early exit (no defer)
+ret=-1
+zero path
+cleanup
+ret=0
+normal path
+cleanup
+ret=5
