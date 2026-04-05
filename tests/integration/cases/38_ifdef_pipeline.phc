@@ -1,0 +1,23 @@
+#include <stdio.h>
+
+#define HAVE_SHAPE 1
+
+#ifdef HAVE_SHAPE
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+#endif
+
+int main(void) {
+#ifdef HAVE_SHAPE
+    Shape s = Shape_mk_Circle(2.0);
+    phc_match(Shape, s) {
+        case Circle(radius): { printf("r=%g\n", radius); } break;
+        case Rectangle: { printf("rect\n"); } break;
+    }
+#else
+    printf("no shape\n");
+#endif
+    return 0;
+}
