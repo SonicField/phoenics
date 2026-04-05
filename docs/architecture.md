@@ -348,9 +348,9 @@ phc processes one file at a time without expanding `#include` directives. The se
 **Out of scope for v1:**
 - ~~Cross-file `phc_match`~~ *(implemented in v2)*
 - ~~`#line` directive emission~~ *(implemented in v2)*
-- Nested phc_descr
+- Nested phc_descr *(not planned — use file-scope definitions instead)*
 - ~~Pattern destructuring in phc_match~~ *(implemented in v2)*
 - ~~Safe accessor functions with tag assertions~~ *(implemented in v1.5)*
 - ~~Conditional compilation interaction (`#ifdef` around phc_descr)~~ *(works in pipeline mode)*
 - ~~Function pointer or array field types~~ *(implemented in v3)*
-- Forward declarations of phc_descr types
+- ~~Forward declarations of phc_descr types~~ *(implemented in v4)*
