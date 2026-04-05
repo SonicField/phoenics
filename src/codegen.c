@@ -191,6 +191,22 @@ static void emit_body_with_defer(Buffer *buf, const char *body, int defer_count,
             if (i < len) { buf_append_n(buf, body + i, 1); i++; }
             continue;
         }
+        /* Skip line comments */
+        if (body[i] == '/' && i + 1 < len && body[i + 1] == '/') {
+            while (i < len && body[i] != '\n') {
+                buf_append_n(buf, body + i, 1); i++;
+            }
+            continue;
+        }
+        /* Skip block comments */
+        if (body[i] == '/' && i + 1 < len && body[i + 1] == '*') {
+            buf_append_n(buf, body + i, 2); i += 2;
+            while (i + 1 < len && !(body[i] == '*' && body[i + 1] == '/')) {
+                buf_append_n(buf, body + i, 1); i++;
+            }
+            if (i + 1 < len) { buf_append_n(buf, body + i, 2); i += 2; }
+            continue;
+        }
         /* Skip char literals */
         if (body[i] == '\'') {
             buf_append_n(buf, body + i, 1); i++;
