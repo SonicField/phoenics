@@ -85,7 +85,6 @@ test-self:
 	@$(BUILDDIR)/test_self
 
 # AddressSanitizer build: catches use-after-free, buffer overflow, memory leaks
-# AddressSanitizer build: catches use-after-free, buffer overflow, memory leaks
 test-asan: clean
 	@echo "=== ASan Build + Test ==="
 	$(MAKE) test CFLAGS="-std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -pedantic -g -fsanitize=address -fno-omit-frame-pointer"
