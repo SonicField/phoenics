@@ -505,6 +505,9 @@ void parse_result_free(ParseResult *result) {
             for (int j = 0; j < m->case_count; j++) {
                 free(m->cases[j].variant_name);
                 free(m->cases[j].body_text);
+                for (int b = 0; b < m->cases[j].binding_count; b++)
+                    free(m->cases[j].bindings[b]);
+                free(m->cases[j].bindings);
             }
             free(m->cases);
         }
