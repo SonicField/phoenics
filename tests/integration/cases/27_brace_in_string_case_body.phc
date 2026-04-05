@@ -1,0 +1,20 @@
+#include <stdio.h>
+
+phc_descr Val {
+    A { int x; },
+    B { int y; }
+};
+
+int main(void) {
+    Val v = Val_mk_A(42);
+    phc_match(Val, v) {
+        case A: {
+            printf("brace in string: }\n");
+            printf("another: { }\n");
+        } break;
+        case B: {
+            printf("B\n");
+        } break;
+    }
+    return 0;
+}
