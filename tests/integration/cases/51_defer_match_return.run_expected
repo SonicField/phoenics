@@ -1,0 +1,6 @@
+ok: 42
+log freed
+ret=42
+err: -1
+log freed
+ret=-1

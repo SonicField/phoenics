@@ -24,11 +24,16 @@ typedef struct {
     char *end_file;     /* source filename (NULL in direct mode) */
 } DescrDecl;
 
+/* Forward declaration for recursive body */
+struct Chunk;
+
 typedef struct {
     char *variant_name;
-    char *body_text;    /* raw text of case body including braces and optional break */
-    char **bindings;    /* field names to destructure (NULL if no parens) */
-    int binding_count;  /* 0 = no destructuring, -1 not used */
+    char *body_text;        /* raw text (legacy, NULL when body_chunks used) */
+    struct Chunk *body_chunks;  /* parsed sub-program chunks (NULL for legacy) */
+    int body_chunk_count;
+    char **bindings;        /* field names to destructure (NULL if no parens) */
+    int binding_count;
 } MatchCase;
 
 typedef struct {

@@ -1,0 +1,33 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+phc_descr Result {
+    Ok { int value; },
+    Err { int code; }
+};
+
+int process(Result r) {
+    int *log = malloc(sizeof(int));
+    *log = 0;
+    phc_defer { free(log); printf("log freed\n"); }
+
+    phc_match(Result, r) {
+        case Ok(value): {
+            printf("ok: %d\n", value);
+            return value;
+        } break;
+        case Err(code): {
+            printf("err: %d\n", code);
+            return code;
+        } break;
+    }
+    return -99;
+}
+
+int main(void) {
+    Result ok = Result_mk_Ok(42);
+    Result err = Result_mk_Err(-1);
+    printf("ret=%d\n", process(ok));
+    printf("ret=%d\n", process(err));
+    return 0;
+}

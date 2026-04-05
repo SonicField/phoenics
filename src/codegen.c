@@ -2,6 +2,7 @@
 #include "buffer.h"
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 /* --- descr codegen --- */
 
@@ -166,9 +167,91 @@ static void emit_bindings(Buffer *buf, const MatchDescr *m, const MatchCase *mc,
     }
 }
 
+/* Emit body text, rewriting return statements to include defer cleanup.
+ * Scans for 'return' at word boundaries, skipping strings/comments. */
+static void emit_body_with_defer(Buffer *buf, const char *body, int defer_count,
+                                  const char **defer_bodies, int defer_body_count) {
+    if (!body || defer_count == 0) {
+        if (body) buf_append(buf, body);
+        return;
+    }
+    size_t len = strlen(body);
+    size_t i = 0;
+    while (i < len) {
+        /* Skip string literals */
+        if (body[i] == '"') {
+            buf_append_n(buf, body + i, 1); i++;
+            while (i < len && body[i] != '"') {
+                if (body[i] == '\\' && i + 1 < len) {
+                    buf_append_n(buf, body + i, 2); i += 2;
+                } else {
+                    buf_append_n(buf, body + i, 1); i++;
+                }
+            }
+            if (i < len) { buf_append_n(buf, body + i, 1); i++; }
+            continue;
+        }
+        /* Skip char literals */
+        if (body[i] == '\'') {
+            buf_append_n(buf, body + i, 1); i++;
+            while (i < len && body[i] != '\'') {
+                if (body[i] == '\\' && i + 1 < len) {
+                    buf_append_n(buf, body + i, 2); i += 2;
+                } else {
+                    buf_append_n(buf, body + i, 1); i++;
+                }
+            }
+            if (i < len) { buf_append_n(buf, body + i, 1); i++; }
+            continue;
+        }
+        /* Check for 'return' keyword at word boundary */
+        if (i + 6 <= len && memcmp(body + i, "return", 6) == 0 &&
+            (i == 0 || !isalnum((unsigned char)body[i - 1])) &&
+            (i + 6 >= len || !isalnum((unsigned char)body[i + 6]))) {
+            /* Found return — find the semicolon at depth 0 */
+            size_t ret_end = i + 6;
+            size_t semi = ret_end;
+            int depth = 0;
+            while (semi < len) {
+                if (body[semi] == '(' || body[semi] == '{') depth++;
+                else if (body[semi] == ')' || body[semi] == '}') depth--;
+                else if (body[semi] == ';' && depth == 0) break;
+                semi++;
+            }
+            /* Extract return expression */
+            size_t es = ret_end;
+            while (es < semi && (body[es] == ' ' || body[es] == '\t')) es++;
+            size_t ee = semi;
+            while (ee > es && (body[ee - 1] == ' ' || body[ee - 1] == '\t')) ee--;
+
+            /* Emit cleanup + return */
+            buf_append(buf, "{ ");
+            for (int d = 0; d < defer_body_count; d++) {
+                if (defer_bodies[d]) {
+                    buf_append(buf, defer_bodies[d]);
+                    buf_append(buf, " ");
+                }
+            }
+            if (ee > es) {
+                buf_append(buf, "return ");
+                buf_append_n(buf, body + es, ee - es);
+                buf_append(buf, "; }");
+            } else {
+                buf_append(buf, "return; }");
+            }
+            i = semi + 1; /* skip past ; */
+            continue;
+        }
+        buf_append_n(buf, body + i, 1);
+        i++;
+    }
+}
+
 static void emit_match_descr(Buffer *buf, const MatchDescr *m,
                               const DescrDecl *descrs, int descr_count,
-                              const DescrType *ext_types, int ext_count) {
+                              const DescrType *ext_types, int ext_count,
+                              int active_defer_count,
+                              const char **defer_bodies, int defer_body_count) {
     buf_append(buf, "switch (");
     buf_append(buf, m->expr_text);
     buf_append(buf, ".tag) {\n");
@@ -179,10 +262,15 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
         if (mc->binding_count > 0) {
             buf_printf(buf, "    case %s_%s: {", m->type_name, mc->variant_name);
             emit_bindings(buf, m, mc, descrs, descr_count, ext_types, ext_count);
-            buf_printf(buf, " %s }\n", mc->body_text);
+            buf_append(buf, " ");
+            emit_body_with_defer(buf, mc->body_text, active_defer_count,
+                                 defer_bodies, defer_body_count);
+            buf_append(buf, " }\n");
         } else {
-            buf_printf(buf, "    case %s_%s: %s\n",
-                       m->type_name, mc->variant_name, mc->body_text);
+            buf_printf(buf, "    case %s_%s: ", m->type_name, mc->variant_name);
+            emit_body_with_defer(buf, mc->body_text, active_defer_count,
+                                 defer_bodies, defer_body_count);
+            buf_append(buf, "\n");
         }
     }
 
@@ -230,14 +318,35 @@ char *codegen(const Program *prog,
             }
             break;
         }
-        case CHUNK_MATCH_DESCR:
+        case CHUNK_MATCH_DESCR: {
+            /* Collect active defer bodies for return interception inside case bodies */
+            int active_defers = 0;
+            const char **dbodies = NULL;
+            int dbody_count = 0;
+            for (int j = i - 1; j >= 0; j--) {
+                if (prog->chunks[j].type == CHUNK_DEFER) {
+                    active_defers++;
+                    dbody_count++;
+                }
+            }
+            if (dbody_count > 0) {
+                dbodies = calloc((size_t)dbody_count, sizeof(const char *));
+                int f = 0;
+                for (int j = i - 1; j >= 0 && f < dbody_count; j--) {
+                    if (prog->chunks[j].type == CHUNK_DEFER)
+                        dbodies[f++] = prog->chunks[j].defer.body_text;
+                }
+            }
             emit_match_descr(&buf, &c->match, prog->descrs, prog->descr_count,
-                            external_types, external_type_count);
+                            external_types, external_type_count,
+                            active_defers, dbodies, dbody_count);
+            free(dbodies);
             if (c->match.end_file)
                 buf_printf(&buf, "\n#line %d \"%s\"", c->match.end_line, c->match.end_file);
             else
                 buf_printf(&buf, "\n#line %d", c->match.end_line);
             break;
+        }
         case CHUNK_DEFER:
             /* Defer body is emitted at CHUNK_RETURN and CHUNK_FUNC_END */
             break;
