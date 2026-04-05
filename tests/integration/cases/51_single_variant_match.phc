@@ -1,0 +1,15 @@
+#include <stdio.h>
+
+phc_descr Wrapper {
+    Value { int x; }
+};
+
+int main(void) {
+    Wrapper w = Wrapper_mk_Value(42);
+    phc_match(Wrapper, w) {
+        case Value(x): {
+            printf("value: %d\n", x);
+        } break;
+    }
+    return 0;
+}
