@@ -95,12 +95,12 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
 
 /* --- match_descr codegen --- */
 
-/* Find a field's type in a variant by field name */
-static const char *find_field_type(const Field *fields, int field_count,
-                                   const char *field_name) {
+/* Find a field in a variant by field name */
+static const Field *find_field(const Field *fields, int field_count,
+                               const char *field_name) {
     for (int i = 0; i < field_count; i++) {
         if (strcmp(fields[i].field_name, field_name) == 0)
-            return fields[i].type_name;
+            return &fields[i];
     }
     return NULL;
 }
@@ -117,10 +117,15 @@ static void emit_bindings(Buffer *buf, const MatchDescr *m, const MatchCase *mc,
             if (strcmp(descrs[i].variants[vi].name, mc->variant_name) != 0) continue;
             const Variant *v = &descrs[i].variants[vi];
             for (int b = 0; b < mc->binding_count; b++) {
-                const char *type = find_field_type(v->fields, v->field_count, mc->bindings[b]);
-                if (type)
+                const Field *f = find_field(v->fields, v->field_count, mc->bindings[b]);
+                if (!f) continue;
+                if (f->is_array)
+                    buf_printf(buf, " %s *%s = %s.%s.%s;",
+                               f->type_name, mc->bindings[b], m->expr_text,
+                               mc->variant_name, mc->bindings[b]);
+                else
                     buf_printf(buf, " %s %s = %s.%s.%s;",
-                               type, mc->bindings[b], m->expr_text,
+                               f->type_name, mc->bindings[b], m->expr_text,
                                mc->variant_name, mc->bindings[b]);
             }
             return;
@@ -135,23 +140,25 @@ static void emit_bindings(Buffer *buf, const MatchDescr *m, const MatchCase *mc,
             Field *fields = ext_types[i].variant_fields[vi];
             int fc = ext_types[i].variant_field_counts[vi];
             for (int b = 0; b < mc->binding_count; b++) {
-                const char *type = find_field_type(fields, fc, mc->bindings[b]);
-                if (!type) continue;
-                /* Function pointer types embed the name as (*name).
-                 * Detect this pattern and emit the type directly as a
-                 * declaration (it already contains the name). */
+                const Field *f = find_field(fields, fc, mc->bindings[b]);
+                if (!f || !f->type_name) continue;
+                /* Function pointer types embed the name as (*name). */
                 char needle[256];
                 int is_fnptr = 0;
                 if (snprintf(needle, sizeof(needle), "(*%s)", mc->bindings[b]) < (int)sizeof(needle)) {
-                    is_fnptr = strstr(type, needle) != NULL;
+                    is_fnptr = strstr(f->type_name, needle) != NULL;
                 }
                 if (is_fnptr)
                     buf_printf(buf, " %s = %s.%s.%s;",
-                               type, m->expr_text,
+                               f->type_name, m->expr_text,
+                               mc->variant_name, mc->bindings[b]);
+                else if (f->is_array)
+                    buf_printf(buf, " %s *%s = %s.%s.%s;",
+                               f->type_name, mc->bindings[b], m->expr_text,
                                mc->variant_name, mc->bindings[b]);
                 else
                     buf_printf(buf, " %s %s = %s.%s.%s;",
-                               type, mc->bindings[b], m->expr_text,
+                               f->type_name, mc->bindings[b], m->expr_text,
                                mc->variant_name, mc->bindings[b]);
             }
             return;

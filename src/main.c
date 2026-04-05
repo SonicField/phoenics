@@ -178,6 +178,7 @@ static int load_type_manifest(const char *path,
             int fc = dt->variant_field_counts[vi];
             dt->variant_fields[vi] = realloc(dt->variant_fields[vi],
                                               sizeof(Field) * (size_t)(fc + 1));
+            memset(&dt->variant_fields[vi][fc], 0, sizeof(Field));
             dt->variant_fields[vi][fc].type_name = type_buf; /* takes ownership */
             dt->variant_fields[vi][fc].field_name = strdup(field_name);
             dt->variant_field_counts[vi] = fc + 1;

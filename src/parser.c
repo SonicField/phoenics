@@ -161,7 +161,7 @@ static int parse_field(Parser *p, Field *f) {
             break;
         }
     }
-    if (simple && !f->is_array) {
+    if (simple) {
         size_t type_len = 0;
         char *type_buf = malloc(256);
         for (int i = 0; i < name_idx; i++) {
