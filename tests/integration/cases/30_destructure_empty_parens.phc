@@ -1,0 +1,19 @@
+#include <stdio.h>
+
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+
+int main(void) {
+    Shape s = Shape_mk_Circle(2.0);
+    phc_match(Shape, s) {
+        case Circle(): {
+            printf("circle (no bindings)\n");
+        } break;
+        case Rectangle(): {
+            printf("rect (no bindings)\n");
+        } break;
+    }
+    return 0;
+}

@@ -95,15 +95,50 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
 
 /* --- match_descr codegen --- */
 
-static void emit_match_descr(Buffer *buf, const MatchDescr *m) {
+/* Find a variant in a DescrDecl by name, return NULL if not found */
+static const Variant *find_variant(const DescrDecl *descrs, int descr_count,
+                                   const char *type_name, const char *variant_name) {
+    for (int i = 0; i < descr_count; i++) {
+        if (strcmp(descrs[i].name, type_name) != 0) continue;
+        for (int j = 0; j < descrs[i].variant_count; j++) {
+            if (strcmp(descrs[i].variants[j].name, variant_name) == 0)
+                return &descrs[i].variants[j];
+        }
+    }
+    return NULL;
+}
+
+static void emit_match_descr(Buffer *buf, const MatchDescr *m,
+                              const DescrDecl *descrs, int descr_count) {
     buf_append(buf, "switch (");
     buf_append(buf, m->expr_text);
     buf_append(buf, ".tag) {\n");
 
     for (int i = 0; i < m->case_count; i++) {
-        buf_printf(buf, "    case %s_%s: %s\n",
-                   m->type_name, m->cases[i].variant_name,
-                   m->cases[i].body_text);
+        const MatchCase *mc = &m->cases[i];
+
+        if (mc->binding_count > 0) {
+            const Variant *v = find_variant(descrs, descr_count,
+                                            m->type_name, mc->variant_name);
+            /* Emit: case Type_Variant: { bindings; body_text_content } break; */
+            buf_printf(buf, "    case %s_%s: {", m->type_name, mc->variant_name);
+            for (int b = 0; b < mc->binding_count; b++) {
+                /* Find the field type for this binding */
+                for (int fi = 0; fi < v->field_count; fi++) {
+                    if (strcmp(v->fields[fi].field_name, mc->bindings[b]) == 0) {
+                        buf_printf(buf, " %s %s = %s.%s.%s;",
+                                   v->fields[fi].type_name, mc->bindings[b],
+                                   m->expr_text, mc->variant_name, mc->bindings[b]);
+                        break;
+                    }
+                }
+            }
+            /* Emit body_text (which starts with '{') inside the outer braces */
+            buf_printf(buf, " %s }\n", mc->body_text);
+        } else {
+            buf_printf(buf, "    case %s_%s: %s\n",
+                       m->type_name, mc->variant_name, mc->body_text);
+        }
     }
 
     buf_append(buf, "    default: break;\n");
@@ -135,7 +170,7 @@ char *codegen(const Program *prog) {
             buf_printf(&buf, "\n#line %d", prog->descrs[c->descr_index].end_line);
             break;
         case CHUNK_MATCH_DESCR:
-            emit_match_descr(&buf, &c->match);
+            emit_match_descr(&buf, &c->match, prog->descrs, prog->descr_count);
             buf_printf(&buf, "\n#line %d", c->match.end_line);
             break;
         }

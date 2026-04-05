@@ -1,0 +1,19 @@
+#include <stdio.h>
+
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+
+int main(void) {
+    Shape s = Shape_mk_Rectangle(5.0, 10.0);
+    phc_match(Shape, s) {
+        case Circle(radius): {
+            printf("circle r=%g\n", radius);
+        } break;
+        case Rectangle(width): {
+            printf("partial: width=%g\n", width);
+        } break;
+    }
+    return 0;
+}

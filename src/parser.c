@@ -162,6 +162,9 @@ static void free_match_contents(MatchDescr *m) {
     for (int i = 0; i < m->case_count; i++) {
         free(m->cases[i].variant_name);
         free(m->cases[i].body_text);
+        for (int b = 0; b < m->cases[i].binding_count; b++)
+            free(m->cases[i].bindings[b]);
+        free(m->cases[i].bindings);
     }
     free(m->cases);
     free(m->type_name);
@@ -333,9 +336,40 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
         mc.variant_name = strndup(p->cur.value, p->cur.length);
         next_token(p);
 
+        /* Optional destructuring: case Variant(field1, field2): */
+        if (p->cur.type == TOK_LPAREN) {
+            next_token(p);
+            int bind_cap = 0;
+            while (p->cur.type != TOK_RPAREN && p->cur.type != TOK_EOF) {
+                if (p->cur.type != TOK_IDENT) {
+                    parser_error(p, "expected field name in destructuring");
+                    free(mc.variant_name);
+                    for (int b = 0; b < mc.binding_count; b++) free(mc.bindings[b]);
+                    free(mc.bindings);
+                    free_match_contents(&m);
+                    return 0;
+                }
+                char *name = strndup(p->cur.value, p->cur.length);
+                DA_PUSH(mc.bindings, mc.binding_count, bind_cap, name);
+                next_token(p);
+                if (p->cur.type == TOK_COMMA) next_token(p);
+            }
+            if (p->cur.type != TOK_RPAREN) {
+                parser_error(p, "expected ')' after destructuring fields");
+                free(mc.variant_name);
+                for (int b = 0; b < mc.binding_count; b++) free(mc.bindings[b]);
+                free(mc.bindings);
+                free_match_contents(&m);
+                return 0;
+            }
+            next_token(p);
+        }
+
         if (p->cur.type != TOK_COLON) {
             parser_error(p, "expected ':' after variant name in match_descr case");
             free(mc.variant_name);
+            for (int b = 0; b < mc.binding_count; b++) free(mc.bindings[b]);
+            free(mc.bindings);
             free_match_contents(&m);
             return 0;
         }

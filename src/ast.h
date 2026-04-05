@@ -24,6 +24,8 @@ typedef struct {
 typedef struct {
     char *variant_name;
     char *body_text;    /* raw text of case body including braces and optional break */
+    char **bindings;    /* field names to destructure (NULL if no parens) */
+    int binding_count;  /* 0 = no destructuring, -1 not used */
 } MatchCase;
 
 typedef struct {

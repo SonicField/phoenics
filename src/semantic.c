@@ -116,6 +116,54 @@ SemanticResult analyse(const Program *prog,
             }
         }
 
+        /* Validate destructuring bindings against descr field names */
+        for (int i = 0; i < m->case_count && !sr.error; i++) {
+            const MatchCase *mc = &m->cases[i];
+            if (mc->binding_count == 0) continue;
+
+            /* Find the DescrDecl and variant (local types only) */
+            const Variant *variant = NULL;
+            for (int di = 0; di < prog->descr_count && !variant; di++) {
+                if (strcmp(prog->descrs[di].name, m->type_name) != 0) continue;
+                for (int vi = 0; vi < prog->descrs[di].variant_count; vi++) {
+                    if (strcmp(prog->descrs[di].variants[vi].name, mc->variant_name) == 0) {
+                        variant = &prog->descrs[di].variants[vi];
+                        break;
+                    }
+                }
+            }
+            if (!variant) {
+                sem_error(&sr, "cannot destructure external type '%s' (field info not available)",
+                          m->type_name);
+                break;
+            }
+
+            /* Check for duplicate bindings */
+            for (int b1 = 0; b1 < mc->binding_count && !sr.error; b1++) {
+                for (int b2 = b1 + 1; b2 < mc->binding_count && !sr.error; b2++) {
+                    if (strcmp(mc->bindings[b1], mc->bindings[b2]) == 0) {
+                        sem_error(&sr, "duplicate binding '%s' in case '%s'",
+                                  mc->bindings[b1], mc->variant_name);
+                    }
+                }
+            }
+
+            /* Check each binding name exists as a field */
+            for (int b = 0; b < mc->binding_count && !sr.error; b++) {
+                int found = 0;
+                for (int fi = 0; fi < variant->field_count; fi++) {
+                    if (strcmp(mc->bindings[b], variant->fields[fi].field_name) == 0) {
+                        found = 1;
+                        break;
+                    }
+                }
+                if (!found) {
+                    sem_error(&sr, "unknown field '%s' in variant '%s' of '%s'",
+                              mc->bindings[b], mc->variant_name, m->type_name);
+                }
+            }
+        }
+
         /* Check exhaustiveness */
         for (int vi = 0; vi < dt->variant_count && !sr.error; vi++) {
             int found = 0;

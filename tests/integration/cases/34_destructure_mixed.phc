@@ -1,0 +1,23 @@
+#include <stdio.h>
+
+phc_descr Expr {
+    Num { int value; },
+    Add { int left; int right; },
+    Neg { int inner; }
+};
+
+int main(void) {
+    Expr e = Expr_mk_Add(3, 4);
+    phc_match(Expr, e) {
+        case Num(value): {
+            printf("num %d\n", value);
+        } break;
+        case Add(left, right): {
+            printf("add %d+%d=%d\n", left, right, left + right);
+        } break;
+        case Neg: {
+            printf("neg (no destructure)\n");
+        } break;
+    }
+    return 0;
+}
