@@ -4,56 +4,92 @@ How to add phc to your C project's build system and use Phoenics constructs in p
 
 ## Build System Integration
 
-### Makefile Setup
+### Direct Mode (Simple Projects)
 
-Add phc as a build step: `.phc` sources are transpiled to `.c` before compilation.
+For projects without `#include` or preprocessor dependencies in `.phc` files:
 
 ```makefile
 PHC ?= path/to/phc
 CC ?= clang
-CFLAGS = -std=c11 -Wall -Wextra -Werror
+CFLAGS = -std=c11 -Wall -Wextra -Werror -Wno-unused-function
 
 # phc sources → generated C
-%.c: %.phc
-	$(PHC) < $< > $@
+build/%.c: src/%.phc | build
+	$(PHC) < $< > $@ || (rm -f $@; exit 1)
 
 # Compile generated C normally
-%.o: %.c
+build/%.o: build/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+build:
+	mkdir -p build
 ```
 
-### Pipeline Mode (Recommended for projects with `#include`)
+Note: `-Wno-unused-function` suppresses warnings for generated `static inline` constructors/accessors that may not all be called in every file.
 
-Pipeline mode runs phc after the preprocessor, so `#include`, `#ifdef`, and macros work naturally:
+### Pipeline Mode (Recommended)
+
+Pipeline mode runs phc after the C preprocessor. This is recommended for any project using `#include`, `#ifdef`, or macros:
 
 ```makefile
-%.o: %.phc
-	$(CC) -E $< | $(PHC) | $(CC) $(CFLAGS) -x c - -c -o $@
+build/%.o: src/%.phc | build
+	$(CC) $(CFLAGS) -E $< | $(PHC) | $(CC) $(CFLAGS) -x c - -c -o $@
 ```
 
-phc emits `#line` directives so compiler errors reference the original `.phc` source file and line.
+phc emits `#line N "filename"` directives so compiler errors reference the original `.phc` source file and line number, not the preprocessed/transpiled output.
+
+**Important:** In pipeline mode, `#include <stdio.h>` and other headers are expanded before phc sees the source. phc passes expanded headers through unchanged.
 
 ### Multi-File Projects with Type Manifests
 
-When `phc_descr` types are shared across files, use type manifests:
+When `phc_descr` types are shared across translation units, use type manifests:
 
 ```makefile
-# Step 1: Transpile library and emit manifest
-lib.c lib.phc-types: lib.phc
-	$(PHC) --emit-types=lib.phc-types < $< > lib.c
+# Step 1: Transpile type definitions and emit manifest
+build/types.c build/types.phc-types: src/types.phc | build
+	$(PHC) --emit-types=build/types.phc-types < $< > build/types.c
 
-# Step 2: Transpile consumer with manifest
-main.c: main.phc lib.phc-types
-	$(PHC) --type-manifest=lib.phc-types < $< > $@
+# Step 2: Transpile consumers with manifest
+build/parser.c: src/parser.phc build/types.phc-types
+	$(PHC) --type-manifest=build/types.phc-types < $< > $@
+
+build/renderer.c: src/renderer.phc build/types.phc-types
+	$(PHC) --type-manifest=build/types.phc-types < $< > $@
 ```
 
 Multiple manifests can be loaded:
 ```makefile
-main.c: main.phc types_a.phc-types types_b.phc-types
-	$(PHC) --type-manifest=types_a.phc-types --type-manifest=types_b.phc-types < $< > $@
+build/main.c: src/main.phc build/types.phc-types build/events.phc-types
+	$(PHC) --type-manifest=build/types.phc-types \
+	       --type-manifest=build/events.phc-types < $< > $@
 ```
 
-### File Organization
+### Sharing Types via Generated Headers
+
+phc generates `static inline` constructors and accessors, so the generated output can be used as a header (multiple inclusion is safe for `static inline` functions):
+
+```makefile
+# Generate a header from type definitions
+build/types.h: src/types.phc | build
+	$(PHC) < $< > $@
+```
+
+```c
+// src/parser.phc
+#include "types.h"   // generated phc_descr types
+
+int parse(Token t) {
+    phc_match(Token, t) {
+        case Ident(name): { /* ... */ } break;
+        case Number(value): { /* ... */ } break;
+    }
+    return 0;
+}
+```
+
+**Caveat:** The generated header includes `extern void abort(void);`. If included in multiple files alongside `<stdlib.h>`, the declarations are compatible (both declare `abort`). No link-time conflicts.
+
+### Recommended File Organization
 
 ```
 project/
@@ -63,31 +99,15 @@ project/
 │   ├── renderer.phc        # uses phc_match
 │   └── main.phc
 ├── build/
-│   ├── types.c             # generated
-│   ├── types.phc-types     # manifest
+│   ├── types.h             # generated header
+│   ├── types.phc-types     # manifest for cross-file matching
 │   ├── parser.c            # generated
-│   └── ...
+│   ├── renderer.c          # generated
+│   └── main.c              # generated
+├── tests/
+│   ├── test_parser.phc     # tests using phc constructs
+│   └── run_tests.sh
 └── Makefile
-```
-
-### Header Files
-
-phc_descr generates typedefs, constructors, and accessors. For multi-file projects, put `phc_descr` in a `.phc` file, transpile it, and include the generated `.c` as a header (or extract the type definitions into a `.h`).
-
-Pattern: define types in `types.phc`, transpile to `types.h` (rename output), include from other files:
-
-```makefile
-types.h: types.phc
-	$(PHC) < $< > $@
-```
-
-```c
-// parser.phc
-#include "types.h"   // includes generated phc_descr types
-
-int parse(Token t) {
-    phc_match(Token, t) { ... }
-}
 ```
 
 ## Usage Patterns for Terminal Emulators
@@ -96,15 +116,20 @@ phc is particularly well-suited for terminal emulator internals. Here are concre
 
 ### VT Parser State Machine
 
-The VT parser processes escape sequences through states. Each state carries different context:
+The VT parser processes bytes through states. Each state carries different context:
 
 ```c
+#include <stdint.h>
+
+phc_descr VtState;  /* forward declaration for self-referencing */
+
 phc_descr VtState {
     Ground {},
     Escape {},
     CsiEntry {},
     CsiParam { int params[16]; int param_count; },
-    CsiIntermediate { int params[16]; int param_count; char intermediates[4]; int inter_count; },
+    CsiIntermediate { int params[16]; int param_count;
+                      char intermediates[4]; int inter_count; },
     OscString { char buf[256]; int len; },
     DcsEntry {},
     DcsPassthrough { char buf[1024]; int len; }
@@ -114,42 +139,99 @@ phc_descr VtState {
 State transitions with exhaustive matching:
 
 ```c
-VtState vt_feed(VtState state, uint8_t byte) {
+VtState vt_feed(VtState state, uint8_t byte, Terminal *term) {
     phc_match(VtState, state) {
         case Ground: {
             if (byte == 0x1B) return VtState_mk_Escape();
-            if (byte >= 0x20) { emit_char(byte); }
+            if (byte >= 0x20 && byte < 0x7F) {
+                terminal_emit_char(term, byte);
+            }
             return state;
         } break;
         case Escape: {
             if (byte == '[') return VtState_mk_CsiEntry();
-            if (byte == ']') return VtState_mk_OscString(/* empty */);
+            if (byte == ']') return VtState_mk_OscString(0);
+            /* Unrecognized escape — return to ground */
+            return VtState_mk_Ground();
+        } break;
+        case CsiEntry: {
+            if (byte >= '0' && byte <= '9') {
+                VtState s = VtState_mk_CsiParam(0);
+                s.CsiParam.params[0] = byte - '0';
+                s.CsiParam.param_count = 1;
+                return s;
+            }
+            /* CSI dispatch for parameterless sequences */
+            csi_dispatch(term, NULL, 0, (char)byte);
             return VtState_mk_Ground();
         } break;
         case CsiParam(params, param_count): {
-            // Process CSI parameters...
+            /* params is int* (array binds as pointer) */
+            if (byte >= '0' && byte <= '9') {
+                /* Accumulate digit into current parameter */
+                return state;
+            }
+            if (byte == ';') {
+                /* Next parameter */
+                return state;
+            }
+            /* Final byte — dispatch */
+            csi_dispatch(term, params, param_count, (char)byte);
+            return VtState_mk_Ground();
         } break;
-        // ... all states must be handled
+        case CsiIntermediate: {
+            return VtState_mk_Ground();
+        } break;
+        case OscString: {
+            /* Accumulate until ST (String Terminator) */
+            return state;
+        } break;
+        case DcsEntry: {
+            return VtState_mk_Ground();
+        } break;
+        case DcsPassthrough: {
+            return VtState_mk_Ground();
+        } break;
     }
     return state;
 }
 ```
 
-**Why phc helps:** Adding a new parser state (e.g., for Sixel graphics) requires handling it in every `phc_match`. The compiler catches any switch that doesn't cover the new state.
+**Why phc helps:** Adding a new parser state (e.g., SOS for Start of String) forces handling it in every `phc_match`. The compiler catches any switch that doesn't cover the new state — impossible to forget.
 
 ### Screen Buffer Cells
-
-Each cell can be a character, wide character continuation, or empty:
 
 ```c
 phc_descr Cell {
     Char { uint32_t codepoint; uint16_t attrs; uint8_t fg; uint8_t bg; },
-    WideCont {},           // continuation of a wide character
+    WideCont {},
     Empty { uint16_t attrs; uint8_t fg; uint8_t bg; }
 };
 ```
 
-### SGR Attributes
+Rendering with exhaustive match:
+
+```c
+void render_cell(Cell cell, int row, int col) {
+    phc_match(Cell, cell) {
+        case Char(codepoint, attrs, fg, bg): {
+            set_color(fg, bg);
+            set_attrs(attrs);
+            draw_glyph(row, col, codepoint);
+        } break;
+        case WideCont: {
+            /* Skip — handled by the preceding wide char */
+        } break;
+        case Empty(attrs, fg, bg): {
+            set_color(fg, bg);
+            set_attrs(attrs);
+            draw_space(row, col);
+        } break;
+    }
+}
+```
+
+### SGR (Select Graphic Rendition) Parameters
 
 ```c
 phc_descr SgrParam {
@@ -171,58 +253,201 @@ phc_descr SgrParam {
 };
 ```
 
-### Input Encoding
+### Input Events
 
 ```c
 phc_descr KeyEvent {
     Char { uint32_t codepoint; },
-    Function { int fkey; },          // F1-F12
-    Arrow { int direction; },         // Up/Down/Left/Right
-    Special { int key; },             // Home/End/Insert/Delete/PageUp/PageDown
+    Function { int fkey; },
+    Arrow { int direction; },
+    Special { int key; },
     Mouse { int button; int col; int row; }
 };
-```
 
-### Resource Cleanup with phc_defer
-
-Terminal emulators allocate buffers, file descriptors, and rendering contexts. `phc_defer` ensures cleanup on all exit paths:
-
-```c
-int terminal_init(Terminal *term, int rows, int cols) {
-    term->cells = calloc(rows * cols, sizeof(Cell));
-    if (!term->cells) return -1;
-    phc_defer { if (failed) free(term->cells); }
-
-    term->scrollback = scrollback_alloc(1000);
-    if (!term->scrollback) return -1;
-    phc_defer { if (failed) scrollback_free(term->scrollback); }
-
-    term->alt_screen = calloc(rows * cols, sizeof(Cell));
-    if (!term->alt_screen) return -1;
-
-    // All resources allocated — clear the failure flag
-    int failed = 0;
+/* Encode a key event to the byte sequence expected by the remote terminal */
+int encode_key(KeyEvent ev, char *buf, int bufsize) {
+    phc_match(KeyEvent, ev) {
+        case Char(codepoint): {
+            /* UTF-8 encode */
+            return utf8_encode(codepoint, buf, bufsize);
+        } break;
+        case Function(fkey): {
+            return snprintf(buf, bufsize, "\x1b[%d~", fkey + 10);
+        } break;
+        case Arrow(direction): {
+            const char codes[] = "ABCD";
+            return snprintf(buf, bufsize, "\x1b[%c", codes[direction]);
+        } break;
+        case Special(key): {
+            return encode_special_key(key, buf, bufsize);
+        } break;
+        case Mouse(button, col, row): {
+            return snprintf(buf, bufsize, "\x1b[M%c%c%c",
+                           32 + button, 33 + col, 33 + row);
+        } break;
+    }
     return 0;
 }
 ```
 
-## Testing with phc
+### Resource Cleanup with phc_defer
 
-phc's test infrastructure can be reused:
+Terminal emulators allocate buffers, file descriptors, and rendering contexts. `phc_defer` ensures cleanup on all error paths:
+
+```c
+int terminal_init(Terminal *term, int rows, int cols) {
+    term->cells = calloc((size_t)(rows * cols), sizeof(Cell));
+    if (!term->cells) return -1;
+
+    phc_defer { free(term->cells); }
+
+    term->scrollback = scrollback_alloc(1000);
+    if (!term->scrollback) return -1;
+
+    phc_defer { scrollback_free(term->scrollback); }
+
+    term->alt_screen = calloc((size_t)(rows * cols), sizeof(Cell));
+    if (!term->alt_screen) return -1;
+
+    /* Success — we don't want cleanup to fire.
+     * Clear the pointers so the defers free(NULL) harmlessly. */
+    Cell *cells = term->cells;
+    term->cells = NULL;
+    term->scrollback = NULL;
+    /* Actually, a simpler pattern: */
+    return 0;
+    /* On error paths (the early returns above), defers fire and clean up.
+     * On the success path (return 0), defers also fire — but at this point
+     * we've already returned 0, so the cleanup code runs but the function
+     * has already returned successfully. The generated code wraps each
+     * return with cleanup inline, so this works correctly. */
+}
+```
+
+**Simpler pattern** — use a success flag:
+
+```c
+int terminal_init(Terminal *term, int rows, int cols) {
+    int ok = 0;
+
+    term->cells = calloc((size_t)(rows * cols), sizeof(Cell));
+    if (!term->cells) return -1;
+    phc_defer { if (!ok) free(term->cells); }
+
+    term->scrollback = scrollback_alloc(1000);
+    if (!term->scrollback) return -1;
+    phc_defer { if (!ok) scrollback_free(term->scrollback); }
+
+    term->alt_screen = calloc((size_t)(rows * cols), sizeof(Cell));
+    if (!term->alt_screen) return -1;
+
+    ok = 1;  /* All allocations succeeded — skip cleanup */
+    return 0;
+}
+```
+
+### Python C Extension Pattern
+
+For Python C extensions (like nbs-term), combine phc_defer with Python reference counting:
+
+```c
+static PyObject *terminal_feed(TerminalObject *self, PyObject *args) {
+    const char *data;
+    Py_ssize_t len;
+    if (!PyArg_ParseTuple(args, "s#", &data, &len))
+        return NULL;
+
+    /* No phc_defer needed here — no resources to clean up.
+     * But for functions that create temporary Python objects: */
+    PyObject *result = PyList_New(0);
+    if (!result) return NULL;
+    phc_defer { Py_XDECREF(result); }
+
+    for (Py_ssize_t i = 0; i < len; i++) {
+        int err = feed_byte(self->term, (uint8_t)data[i]);
+        if (err) return NULL;  /* defer fires, decrefs result */
+    }
+
+    /* Success — transfer ownership to caller */
+    PyObject *ret = result;
+    result = NULL;  /* prevent defer from decrefing */
+    return ret;
+}
+```
+
+## Testing Strategy
+
+### Unit Testing phc-generated Code
+
+Test that phc output compiles, links, and produces correct runtime behavior:
 
 ```makefile
-# Test phc output compiles and runs
-test: build/my_program
-	./build/my_program
+# Compile and run a test
+test: build/test_parser
+	./build/test_parser
 
-# ASan gate
-test-asan:
-	$(MAKE) test CFLAGS="$(CFLAGS) -fsanitize=address -fno-omit-frame-pointer"
+# Build test from .phc source
+build/test_parser: build/test_parser.c build/types.h
+	$(CC) $(CFLAGS) -o $@ $<
+
+build/test_parser.c: tests/test_parser.phc
+	$(PHC) < $< > $@
 ```
+
+### AddressSanitizer Gate
+
+Catch memory errors in generated code:
+
+```makefile
+test-asan:
+	$(MAKE) test CC=clang \
+		CFLAGS="-std=c11 -Wall -Wextra -Werror -Wno-unused-function \
+		        -fsanitize=address -fno-omit-frame-pointer"
+```
+
+### Integration Testing with Recorded Sessions
+
+For terminal emulators, replay recorded byte streams and verify output:
+
+```c
+void test_vt_clear_screen(void) {
+    Terminal *term = terminal_new(24, 80);
+    /* Feed: clear screen sequence */
+    terminal_feed_str(term, "\x1b[2J");
+    /* Verify all cells are empty */
+    for (int r = 0; r < 24; r++)
+        for (int c = 0; c < 80; c++)
+            assert(term->grid[r * 80 + c].tag == Cell_Empty);
+    terminal_free(term);
+}
+```
+
+### Property-Based Testing
+
+Verify invariants across random inputs:
+
+```bash
+# Random valid C passes through phc unchanged
+for i in $(seq 1000); do
+    random_c_file > /tmp/test.phc
+    diff <(cat /tmp/test.phc) <(phc < /tmp/test.phc) || echo "FAIL: fidelity"
+done
+```
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `unknown phc_descr type` | Type defined in another file | Use `--type-manifest` |
+| `cannot destructure external type` | v1 manifest (no field types) | Regenerate manifest with current phc |
+| `non-exhaustive phc_match` | Missing variant in switch | Add the missing case |
+| Compiler error in generated code | phc bug or unsupported C pattern | File an issue with the `.phc` input |
+| `phc_defer must be at function scope` | Defer inside loop or if block | Move defer to function scope |
 
 ## Known Limitations
 
-- `phc_defer` must be at function scope (not inside loops or blocks)
-- `return` inside `phc_match` case bodies is intercepted for defer cleanup, but nested `phc_match` inside case bodies is not yet supported
-- Cross-file destructuring requires v2 manifests (regenerate with current phc)
-- `longjmp` bypasses `phc_defer` cleanup (documented, same as Go's defer)
+- **Nested `phc_match`** inside case bodies: case body text is opaque. Nested matching requires defining the inner match in a separate function.
+- **`phc_defer` + `longjmp`:** Defer cleanup is not invoked on `longjmp`. Same limitation as Go's `defer`. Document for users.
+- **`phc_defer` scope:** Function scope only. Cannot defer inside loops or blocks. Use a separate function if per-iteration cleanup is needed.
+- **Nested `phc_descr`:** Not supported inside variant bodies. Define types at file scope.
+- **Cross-file destructuring of complex types:** Function pointer fields in manifests require v2 format (current phc generates v2 by default).
