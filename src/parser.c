@@ -538,11 +538,14 @@ ParseResult parse(const char *source) {
             parse_match_descr(&p, kw_pos);
         } else if (p.cur.type == TOK_PHC_DEFER) {
             /* phc_defer { body } */
+            if (p.lex.scan_brace_depth > 1) {
+                parser_error(&p, "phc_defer must be at function scope, not inside loops or blocks");
+            }
             add_passthrough(&p, p.passthrough_start, p.cur.pos);
             next_token(&p); /* consume phc_defer — now in struct mode */
-            if (p.cur.type != TOK_LBRACE) {
+            if (!p.error && p.cur.type != TOK_LBRACE) {
                 parser_error(&p, "expected '{' after phc_defer");
-            } else {
+            } else if (!p.error) {
                 size_t brace_pos = p.cur.pos;
                 next_token(&p);
                 /* Capture body by brace-depth counting */
