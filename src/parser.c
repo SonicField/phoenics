@@ -36,6 +36,11 @@ typedef struct {
     int chunk_count;
     int chunk_cap;
 
+    DeferBlock *defers;
+    int defer_count;
+    int defer_cap;
+    int active_defer_count; /* defers active in current function scope */
+
     size_t passthrough_start;
 } Parser;
 
@@ -531,6 +536,97 @@ ParseResult parse(const char *source) {
             size_t kw_pos = p.cur.pos;
             next_token(&p);
             parse_match_descr(&p, kw_pos);
+        } else if (p.cur.type == TOK_PHC_DEFER) {
+            /* phc_defer { body } */
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            next_token(&p); /* consume phc_defer — now in struct mode */
+            if (p.cur.type != TOK_LBRACE) {
+                parser_error(&p, "expected '{' after phc_defer");
+            } else {
+                size_t brace_pos = p.cur.pos;
+                next_token(&p);
+                /* Capture body by brace-depth counting */
+                int depth = 1;
+                while (p.cur.type != TOK_EOF && depth > 0) {
+                    if (p.cur.type == TOK_LBRACE) depth++;
+                    if (p.cur.type == TOK_RBRACE) { depth--; if (depth == 0) break; }
+                    next_token(&p);
+                }
+                /* Body text is between opening { and closing } */
+                size_t body_start = brace_pos + 1;
+                size_t body_end = p.cur.pos;
+                while (body_end > body_start &&
+                       (p.source[body_end - 1] == ' ' || p.source[body_end - 1] == '\t' ||
+                        p.source[body_end - 1] == '\n'))
+                    body_end--;
+                /* Set defer_active BEFORE consuming }, so the lexer's
+                 * transition back to scan mode will detect 'return' */
+                p.lex.defer_active = 1;
+                next_token(&p); /* consume closing } — back to scan mode */
+
+                DeferBlock db;
+                db.body_text = strndup(p.source + body_start, body_end - body_start);
+                db.defer_index = p.active_defer_count;
+                DA_PUSH(p.defers, p.defer_count, p.defer_cap, db);
+                p.active_defer_count++;
+
+                Chunk c;
+                memset(&c, 0, sizeof(c));
+                c.type = CHUNK_DEFER;
+                c.defer = db;
+                DA_PUSH(p.chunks, p.chunk_count, p.chunk_cap, c);
+
+                p.lex.defer_active = 1;
+                p.passthrough_start = p.cur.pos;
+            }
+        } else if (p.cur.type == TOK_RETURN) {
+            /* return <expr>; with active defer — rewrite to goto */
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            size_t ret_end = p.cur.pos + p.cur.length; /* after 'return' */
+
+            /* Find the ; in source text (return expression ends at ;) */
+            size_t semi = ret_end;
+            while (semi < p.source_len && p.source[semi] != ';') semi++;
+
+            /* Extract expression (between 'return' and ';'), trimmed */
+            size_t expr_s = ret_end;
+            while (expr_s < semi && (p.source[expr_s] == ' ' || p.source[expr_s] == '\t'))
+                expr_s++;
+            size_t expr_e = semi;
+            while (expr_e > expr_s && (p.source[expr_e - 1] == ' ' || p.source[expr_e - 1] == '\t'))
+                expr_e--;
+
+            Chunk c;
+            memset(&c, 0, sizeof(c));
+            c.type = CHUNK_RETURN;
+            c.ret.expr = (expr_e > expr_s) ? strndup(p.source + expr_s, expr_e - expr_s) : NULL;
+            c.ret.defer_count = p.active_defer_count;
+            DA_PUSH(p.chunks, p.chunk_count, p.chunk_cap, c);
+
+            /* Advance lexer past the ; */
+            while (p.lex.pos <= semi && p.lex.pos < p.lex.len) {
+                if (p.lex.src[p.lex.pos] == '\n') {
+                    p.lex.line++; p.lex.col = 1;
+                    if (p.lex.marker_seen) p.lex.orig_line++;
+                } else { p.lex.col++; }
+                p.lex.pos++;
+            }
+            p.passthrough_start = p.lex.pos;
+            p.cur = lexer_next(&p.lex);
+        } else if (p.cur.type == TOK_RBRACE && p.active_defer_count > 0) {
+            /* Function closing brace with active defers */
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+
+            Chunk c;
+            memset(&c, 0, sizeof(c));
+            c.type = CHUNK_FUNC_END;
+            c.func_end.defer_count = p.active_defer_count;
+            DA_PUSH(p.chunks, p.chunk_count, p.chunk_cap, c);
+
+            p.active_defer_count = 0;
+            p.lex.defer_active = 0;
+            p.passthrough_start = p.cur.pos; /* } included in next passthrough */
+            next_token(&p);
         } else {
             next_token(&p);
         }
@@ -553,6 +649,8 @@ ParseResult parse(const char *source) {
     result.program.descr_count = p.descr_count;
     result.program.chunks = p.chunks;
     result.program.chunk_count = p.chunk_count;
+    result.program.defers = p.defers;
+    result.program.defer_count = p.defer_count;
 
     return result;
 }
@@ -592,6 +690,13 @@ void parse_result_free(ParseResult *result) {
             free(m->cases);
         }
     }
+    for (int i = 0; i < result->program.chunk_count; i++) {
+        if (result->program.chunks[i].type == CHUNK_RETURN)
+            free(result->program.chunks[i].ret.expr);
+    }
     free(result->program.chunks);
+    for (int i = 0; i < result->program.defer_count; i++)
+        free(result->program.defers[i].body_text);
+    free(result->program.defers);
     memset(result, 0, sizeof(*result));
 }

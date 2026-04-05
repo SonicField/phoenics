@@ -12,6 +12,8 @@ void lexer_init(Lexer *lex, const char *source) {
     lex->mode = LEXER_SCAN;
     lex->brace_depth = 0;
     lex->depth_zero_seen = 0;
+    lex->defer_active = 0;
+    lex->scan_brace_depth = 0;
     lex->orig_line = 1;
     lex->orig_file = NULL;
     lex->orig_file_len = 0;
@@ -186,14 +188,14 @@ static Token lexer_next_scan(Lexer *lex) {
 
             /* Check for Phoenics keywords (phc_ prefixed — no collision risk) */
             if (check_keyword(lex, id_start, id_len, "phc_descr", 9) ||
-                check_keyword(lex, id_start, id_len, "phc_match", 9)) {
+                check_keyword(lex, id_start, id_len, "phc_match", 9) ||
+                check_keyword(lex, id_start, id_len, "phc_defer", 9)) {
                 /* Keyword found! Emit TOK_OTHER for text before it, if any */
                 if (id_start > start) {
                     return make_token(TOK_OTHER, lex->src + start,
                                       id_start - start, start, sline, scol, sorig);
                 }
                 /* Emit the keyword token */
-                /* Advance past the keyword */
                 int kline = lex->line;
                 int kcol = lex->col;
                 int korig = lex->orig_line;
@@ -203,7 +205,12 @@ static Token lexer_next_scan(Lexer *lex) {
                 lex->brace_depth = 0;
                 lex->depth_zero_seen = 0;
 
-                if (id_len == 9 && lex->src[id_start + 4] == 'd') {
+                if (id_len == 9 && lex->src[id_start + 4] == 'd' &&
+                    lex->src[id_start + 6] == 'f') {
+                    /* phc_defer */
+                    return make_token(TOK_PHC_DEFER, lex->src + id_start,
+                                      id_len, id_start, kline, kcol, korig);
+                } else if (id_len == 9 && lex->src[id_start + 4] == 'd') {
                     return make_token(TOK_DESCR, lex->src + id_start,
                                       id_len, id_start, kline, kcol, korig);
                 } else {
@@ -212,9 +219,45 @@ static Token lexer_next_scan(Lexer *lex) {
                 }
             }
 
+            /* Check for 'return' keyword when defer is active */
+            if (lex->defer_active &&
+                check_keyword(lex, id_start, id_len, "return", 6)) {
+                if (id_start > start) {
+                    return make_token(TOK_OTHER, lex->src + start,
+                                      id_start - start, start, sline, scol, sorig);
+                }
+                int kline = lex->line;
+                int kcol = lex->col;
+                int korig = lex->orig_line;
+                while (lex->pos < id_end) advance(lex);
+                return make_token(TOK_RETURN, lex->src + id_start,
+                                  id_len, id_start, kline, kcol, korig);
+            }
+
             /* Not a keyword — skip the identifier and continue scanning */
             while (lex->pos < id_end) advance(lex);
             continue;
+        }
+
+        /* Track brace depth in scan mode for defer function boundary */
+        if (c == '{') lex->scan_brace_depth++;
+        else if (c == '}') {
+            lex->scan_brace_depth--;
+            if (lex->scan_brace_depth <= 0 && lex->defer_active) {
+                /* Function closing brace — emit text before it, then the brace */
+                lex->defer_active = 0;
+                if (lex->pos > start) {
+                    return make_token(TOK_OTHER, lex->src + start,
+                                      lex->pos - start, start, sline, scol, sorig);
+                }
+                /* Return the closing brace as TOK_RBRACE so parser can emit cleanup */
+                int kline = lex->line;
+                int kcol = lex->col;
+                int korig = lex->orig_line;
+                advance(lex);
+                return make_token(TOK_RBRACE, lex->src + lex->pos - 1,
+                                  1, lex->pos - 1, kline, kcol, korig);
+            }
         }
 
         /* Any other character — just advance */

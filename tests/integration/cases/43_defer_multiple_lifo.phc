@@ -1,0 +1,12 @@
+#include <stdio.h>
+
+int main(void) {
+    printf("start\n");
+
+    phc_defer { printf("defer 1\n"); }
+    phc_defer { printf("defer 2\n"); }
+    phc_defer { printf("defer 3\n"); }
+
+    printf("before return\n");
+    return 0;
+}

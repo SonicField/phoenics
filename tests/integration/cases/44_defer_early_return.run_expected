@@ -1,0 +1,6 @@
+early return
+freed
+ret=-1
+normal path
+freed
+ret=0

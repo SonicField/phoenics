@@ -41,10 +41,23 @@ typedef struct {
     char *end_file;         /* source filename (NULL in direct mode) */
 } MatchDescr;
 
+typedef struct {
+    char *body_text;    /* cleanup code to execute */
+    int defer_index;    /* sequential index within function (for label generation) */
+} DeferBlock;
+
+typedef struct {
+    char *expr;         /* return expression text (NULL for void/bare return) */
+    int defer_count;    /* number of active defers at this return point */
+} ReturnStmt;
+
 typedef enum {
     CHUNK_PASSTHROUGH,
     CHUNK_DESCR,
-    CHUNK_MATCH_DESCR
+    CHUNK_MATCH_DESCR,
+    CHUNK_DEFER,
+    CHUNK_RETURN,
+    CHUNK_FUNC_END      /* function closing brace with pending defers */
 } ChunkType;
 
 typedef struct {
@@ -53,6 +66,9 @@ typedef struct {
         struct { size_t start; size_t end; } passthrough;
         int descr_index;
         MatchDescr match;
+        DeferBlock defer;
+        ReturnStmt ret;
+        struct { int defer_count; } func_end; /* defers to emit at function close */
     };
 } Chunk;
 
@@ -63,6 +79,8 @@ typedef struct {
     int descr_count;
     Chunk *chunks;
     int chunk_count;
+    DeferBlock *defers;     /* all defer blocks (referenced by chunks) */
+    int defer_count;
 } Program;
 
 #endif /* PHC_AST_H */

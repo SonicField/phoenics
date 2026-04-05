@@ -18,6 +18,8 @@ typedef enum {
     TOK_COLON,        /* : */
     TOK_CASE,         /* 'case' keyword */
     TOK_BREAK,        /* 'break' keyword */
+    TOK_PHC_DEFER,    /* 'phc_defer' keyword */
+    TOK_RETURN,       /* 'return' keyword (scan mode, only when defer active) */
     TOK_OTHER         /* anything that isn't part of descr/match_descr syntax */
 } TokenType;
 
@@ -45,6 +47,9 @@ typedef struct {
     LexerMode mode;
     int brace_depth;     /* tracked in STRUCT mode */
     int depth_zero_seen; /* flag: closing } brought depth to 0 */
+    /* Defer tracking */
+    int defer_active;    /* nonzero when phc_defer is pending in current function */
+    int scan_brace_depth; /* brace depth in scan mode (for function boundary tracking) */
     /* Preprocessor marker tracking (pipeline mode) */
     int orig_line;       /* original source line from last # marker */
     const char *orig_file; /* pointer into source for filename */
