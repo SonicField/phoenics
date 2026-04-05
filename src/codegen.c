@@ -263,6 +263,13 @@ static void emit_body_with_defer(Buffer *buf, const char *body, int defer_count,
     }
 }
 
+/* Forward declaration for recursive chunk emission */
+static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
+                         const char *source, const DescrDecl *descrs, int descr_count,
+                         const DescrType *ext_types, int ext_count,
+                         int active_defer_count,
+                         const char **defer_bodies, int defer_body_count);
+
 static void emit_match_descr(Buffer *buf, const MatchDescr *m,
                               const DescrDecl *descrs, int descr_count,
                               const DescrType *ext_types, int ext_count,
@@ -275,7 +282,24 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
     for (int i = 0; i < m->case_count; i++) {
         const MatchCase *mc = &m->cases[i];
 
-        if (mc->binding_count > 0) {
+        if (mc->body_chunks && mc->body_chunk_count > 0) {
+            /* Recursive body parsing: emit parsed chunks */
+            if (mc->binding_count > 0) {
+                buf_printf(buf, "    case %s_%s: {", m->type_name, mc->variant_name);
+                emit_bindings(buf, m, mc, descrs, descr_count, ext_types, ext_count);
+                buf_append(buf, " ");
+            } else {
+                buf_printf(buf, "    case %s_%s: ", m->type_name, mc->variant_name);
+            }
+            emit_chunks(buf, (const Chunk *)mc->body_chunks, mc->body_chunk_count,
+                        mc->body_text, descrs, descr_count,
+                        ext_types, ext_count,
+                        active_defer_count, defer_bodies, defer_body_count);
+            if (mc->binding_count > 0)
+                buf_append(buf, " }\n");
+            else
+                buf_append(buf, "\n");
+        } else if (mc->binding_count > 0) {
             buf_printf(buf, "    case %s_%s: {", m->type_name, mc->variant_name);
             emit_bindings(buf, m, mc, descrs, descr_count, ext_types, ext_count);
             buf_append(buf, " ");
@@ -292,6 +316,76 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
 
     buf_append(buf, "    default: break;\n");
     buf_append(buf, "}");
+}
+
+/* Emit an array of chunks (used for case body sub-programs) */
+static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
+                         const char *source, const DescrDecl *descrs, int descr_count,
+                         const DescrType *ext_types, int ext_count,
+                         int active_defer_count,
+                         const char **defer_bodies, int defer_body_count) {
+    for (int i = 0; i < chunk_count; i++) {
+        const Chunk *c = &chunks[i];
+        switch (c->type) {
+        case CHUNK_PASSTHROUGH:
+            if (active_defer_count > 0) {
+                /* Scan passthrough for returns when defers are active */
+                char *text = strndup(source + c->passthrough.start,
+                                     c->passthrough.end - c->passthrough.start);
+                emit_body_with_defer(buf, text, active_defer_count,
+                                     defer_bodies, defer_body_count);
+                free(text);
+            } else {
+                buf_append_n(buf, source + c->passthrough.start,
+                             c->passthrough.end - c->passthrough.start);
+            }
+            break;
+        case CHUNK_DESCR:
+            /* Not expected in case bodies, but handle gracefully */
+            break;
+        case CHUNK_MATCH_DESCR:
+            emit_match_descr(buf, &c->match, descrs, descr_count,
+                            ext_types, ext_count,
+                            active_defer_count, defer_bodies, defer_body_count);
+            break;
+        case CHUNK_DEFER:
+            /* Track but don't emit — handled at CHUNK_RETURN/CHUNK_FUNC_END */
+            active_defer_count++;
+            defer_body_count++;
+            break;
+        case CHUNK_RETURN: {
+            int n = c->ret.defer_count + active_defer_count;
+            /* Collect ALL defer bodies (from enclosing + local) */
+            const char **all_bodies = calloc((size_t)(n > 0 ? n : 1), sizeof(const char *));
+            int found = 0;
+            /* Local defers from this chunk array */
+            for (int j = i - 1; j >= 0 && found < c->ret.defer_count; j--) {
+                if (chunks[j].type == CHUNK_DEFER)
+                    all_bodies[found++] = chunks[j].defer.body_text;
+            }
+            /* Enclosing defers */
+            for (int d = 0; d < defer_body_count && found < n; d++)
+                all_bodies[found++] = defer_bodies[d];
+
+            buf_append(buf, "{ ");
+            for (int d = 0; d < found; d++) {
+                if (all_bodies[d]) {
+                    buf_append(buf, all_bodies[d]);
+                    buf_append(buf, " ");
+                }
+            }
+            if (c->ret.expr)
+                buf_printf(buf, "return %s; }", c->ret.expr);
+            else
+                buf_append(buf, "return; }");
+            free(all_bodies);
+            break;
+        }
+        case CHUNK_FUNC_END:
+            /* Not expected in case bodies */
+            break;
+        }
+    }
 }
 
 /* --- Main codegen --- */

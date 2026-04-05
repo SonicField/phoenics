@@ -1,0 +1,41 @@
+#include <stdio.h>
+
+phc_descr Outer {
+    A { int x; },
+    B { int y; }
+};
+
+phc_descr Inner {
+    P { int p; },
+    Q { int q; }
+};
+
+void process(Outer o, Inner i) {
+    phc_match(Outer, o) {
+        case A(x): {
+            phc_match(Inner, i) {
+                case P(p): {
+                    printf("A.P: %d %d\n", x, p);
+                } break;
+                case Q(q): {
+                    printf("A.Q: %d %d\n", x, q);
+                } break;
+            }
+        } break;
+        case B(y): {
+            printf("B: %d\n", y);
+        } break;
+    }
+}
+
+int main(void) {
+    Outer a = Outer_mk_A(10);
+    Inner p = Inner_mk_P(20);
+    Inner q = Inner_mk_Q(30);
+    Outer b = Outer_mk_B(99);
+
+    process(a, p);
+    process(a, q);
+    process(b, p);
+    return 0;
+}

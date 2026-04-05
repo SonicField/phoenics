@@ -213,6 +213,32 @@ static void free_match_contents(MatchDescr *m) {
     for (int i = 0; i < m->case_count; i++) {
         free(m->cases[i].variant_name);
         free(m->cases[i].body_text);
+        /* Free recursively parsed body chunks */
+        if (m->cases[i].body_chunks) {
+            for (int j = 0; j < m->cases[i].body_chunk_count; j++) {
+                Chunk *bc = &m->cases[i].body_chunks[j];
+                if (bc->type == CHUNK_MATCH_DESCR) {
+                    free(bc->match.type_name);
+                    free(bc->match.expr_text);
+                    free(bc->match.end_file);
+                    /* Recursive: cases in nested match also need freeing */
+                    for (int k = 0; k < bc->match.case_count; k++) {
+                        free(bc->match.cases[k].variant_name);
+                        free(bc->match.cases[k].body_text);
+                        free(bc->match.cases[k].body_chunks);
+                        for (int b = 0; b < bc->match.cases[k].binding_count; b++)
+                            free(bc->match.cases[k].bindings[b]);
+                        free(bc->match.cases[k].bindings);
+                    }
+                    free(bc->match.cases);
+                } else if (bc->type == CHUNK_RETURN) {
+                    free(bc->ret.expr);
+                } else if (bc->type == CHUNK_DEFER) {
+                    free(bc->defer.body_text);
+                }
+            }
+            free(m->cases[i].body_chunks);
+        }
         for (int b = 0; b < m->cases[i].binding_count; b++)
             free(m->cases[i].bindings[b]);
         free(m->cases[i].bindings);
@@ -491,6 +517,19 @@ static int parse_match_descr(Parser *p, size_t keyword_pos) {
         }
         mc.body_text = strndup(p->source + body_start, body_end - body_start);
 
+        /* Re-parse body text to extract phc constructs (recursive body parsing) */
+        if (mc.body_text) {
+            ParseResult sub = parse(mc.body_text);
+            if (!sub.error && sub.program.chunk_count > 0) {
+                mc.body_chunks = sub.program.chunks;
+                mc.body_chunk_count = sub.program.chunk_count;
+                /* Transfer chunk ownership — NULL out before freeing */
+                sub.program.chunks = NULL;
+                sub.program.chunk_count = 0;
+            }
+            parse_result_free(&sub);
+        }
+
         DA_PUSH(m.cases, m.case_count, case_cap, mc);
         while (p->cur.type == TOK_OTHER) next_token(p);
     }
@@ -694,23 +733,11 @@ void parse_result_free(ParseResult *result) {
     for (int i = 0; i < result->program.chunk_count; i++) {
         Chunk *c = &result->program.chunks[i];
         if (c->type == CHUNK_MATCH_DESCR) {
-            MatchDescr *m = &c->match;
-            free(m->type_name);
-            free(m->expr_text);
-            free(m->end_file);
-            for (int j = 0; j < m->case_count; j++) {
-                free(m->cases[j].variant_name);
-                free(m->cases[j].body_text);
-                for (int b = 0; b < m->cases[j].binding_count; b++)
-                    free(m->cases[j].bindings[b]);
-                free(m->cases[j].bindings);
-            }
-            free(m->cases);
+            free_match_contents(&c->match);
+        } else if (c->type == CHUNK_RETURN) {
+            free(c->ret.expr);
         }
-    }
-    for (int i = 0; i < result->program.chunk_count; i++) {
-        if (result->program.chunks[i].type == CHUNK_RETURN)
-            free(result->program.chunks[i].ret.expr);
+        /* Note: CHUNK_DEFER body_text is freed via program.defers below */
     }
     free(result->program.chunks);
     for (int i = 0; i < result->program.defer_count; i++)

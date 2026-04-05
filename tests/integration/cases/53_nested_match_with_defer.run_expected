@@ -1,0 +1,9 @@
+process ok: 10 + 5 = 15
+log freed
+ret=15
+process err: -1
+log freed
+ret=-1
+skip
+log freed
+ret=0

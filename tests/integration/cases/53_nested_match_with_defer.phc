@@ -1,0 +1,50 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+phc_descr Result {
+    Ok { int value; },
+    Err { int code; }
+};
+
+phc_descr Action {
+    Process { int input; },
+    Skip {}
+};
+
+int handle(Action act, Result res) {
+    int *log = malloc(sizeof(int));
+    *log = 0;
+    phc_defer { free(log); printf("log freed\n"); }
+
+    phc_match(Action, act) {
+        case Process(input): {
+            phc_match(Result, res) {
+                case Ok(value): {
+                    printf("process ok: %d + %d = %d\n", input, value, input + value);
+                    return input + value;
+                } break;
+                case Err(code): {
+                    printf("process err: %d\n", code);
+                    return code;
+                } break;
+            }
+        } break;
+        case Skip: {
+            printf("skip\n");
+            return 0;
+        } break;
+    }
+    return -99;
+}
+
+int main(void) {
+    Action proc = Action_mk_Process(10);
+    Action skip = Action_mk_Skip();
+    Result ok = Result_mk_Ok(5);
+    Result err = Result_mk_Err(-1);
+
+    printf("ret=%d\n", handle(proc, ok));
+    printf("ret=%d\n", handle(proc, err));
+    printf("ret=%d\n", handle(skip, ok));
+    return 0;
+}

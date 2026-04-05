@@ -24,13 +24,13 @@ typedef struct {
     char *end_file;     /* source filename (NULL in direct mode) */
 } DescrDecl;
 
-/* Forward declaration for recursive body */
-struct Chunk;
+/* Forward declaration — Chunk is defined below */
+typedef struct Chunk Chunk;
 
 typedef struct {
     char *variant_name;
-    char *body_text;        /* raw text (legacy, NULL when body_chunks used) */
-    struct Chunk *body_chunks;  /* parsed sub-program chunks (NULL for legacy) */
+    char *body_text;        /* raw text (source for body_chunks passthrough offsets) */
+    Chunk *body_chunks;     /* parsed sub-program chunks (NULL if no phc constructs) */
     int body_chunk_count;
     char **bindings;        /* field names to destructure (NULL if no parens) */
     int binding_count;
@@ -65,7 +65,7 @@ typedef enum {
     CHUNK_FUNC_END      /* function closing brace with pending defers */
 } ChunkType;
 
-typedef struct {
+struct Chunk {
     ChunkType type;
     union {
         struct { size_t start; size_t end; } passthrough;
@@ -73,9 +73,9 @@ typedef struct {
         MatchDescr match;
         DeferBlock defer;
         ReturnStmt ret;
-        struct { int defer_count; } func_end; /* defers to emit at function close */
+        struct { int defer_count; } func_end;
     };
-} Chunk;
+};
 
 typedef struct {
     const char *source;     /* original source text (not owned) */
