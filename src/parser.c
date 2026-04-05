@@ -253,6 +253,25 @@ static int parse_descr(Parser *p) {
     d.name = strndup(p->cur.value, p->cur.length);
     next_token(p);
 
+    /* Forward declaration: phc_descr Name; */
+    if (p->cur.type == TOK_SEMICOLON) {
+        size_t end_pos = p->cur.pos + 1;
+        next_token(p);
+
+        d.variant_count = -1; /* sentinel: forward declaration */
+        int idx = p->descr_count;
+        DA_PUSH(p->descrs, p->descr_count, p->descr_cap, d);
+
+        Chunk c;
+        memset(&c, 0, sizeof(c));
+        c.type = CHUNK_DESCR;
+        c.descr_index = idx;
+        DA_PUSH(p->chunks, p->chunk_count, p->chunk_cap, c);
+
+        p->passthrough_start = end_pos;
+        return 1;
+    }
+
     if (p->cur.type != TOK_LBRACE) {
         parser_error(p, "expected '{' after descr type name");
         free(d.name);

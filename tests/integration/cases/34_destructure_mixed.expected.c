@@ -21,7 +21,7 @@ typedef struct {
     int inner;
 } Expr_Neg_t;
 
-typedef struct {
+typedef struct Expr {
     Expr_Tag tag;
     union {
         Expr_Num_t Num;

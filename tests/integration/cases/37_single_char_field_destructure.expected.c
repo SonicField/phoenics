@@ -20,7 +20,7 @@ typedef struct {
     double *p;
 } Pair_P_t;
 
-typedef struct {
+typedef struct Pair {
     Pair_Tag tag;
     union {
         Pair_I_t I;

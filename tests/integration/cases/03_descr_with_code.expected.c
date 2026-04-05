@@ -15,7 +15,7 @@ typedef struct {
     char _empty;
 } Option_int_None_t;
 
-typedef struct {
+typedef struct Option_int {
     Option_int_Tag tag;
     union {
         Option_int_Some_t Some;

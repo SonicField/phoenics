@@ -30,8 +30,8 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
         buf_printf(buf, "} %s_%s_t;\n", d->name, v->name);
     }
 
-    /* Main struct with anonymous union using named variant types */
-    buf_printf(buf, "\ntypedef struct {\n");
+    /* Main struct with named tag (enables forward declarations) */
+    buf_printf(buf, "\ntypedef struct %s {\n", d->name);
     buf_printf(buf, "    %s_Tag tag;\n", d->name);
     buf_append(buf, "    union {\n");
     for (int i = 0; i < d->variant_count; i++) {
@@ -193,8 +193,13 @@ char *codegen(const Program *prog,
     /* Declare abort() for safe accessor functions. Use a direct declaration
      * instead of #include <stdlib.h> to avoid double-inclusion when phc runs
      * post-preprocessor (cc -E | phc | cc — stdlib.h is already expanded). */
-    if (prog->descr_count > 0) {
-        buf_append(&buf, "extern void abort(void);\n");
+    /* Emit abort() declaration only if there are full descr definitions
+     * (not just forward declarations) */
+    for (int i = 0; i < prog->descr_count; i++) {
+        if (prog->descrs[i].variant_count >= 0) {
+            buf_append(&buf, "extern void abort(void);\n");
+            break;
+        }
     }
 
     for (int i = 0; i < prog->chunk_count; i++) {
@@ -206,11 +211,16 @@ char *codegen(const Program *prog,
             break;
         case CHUNK_DESCR: {
             const DescrDecl *d = &prog->descrs[c->descr_index];
-            emit_descr(&buf, d);
-            if (d->end_file)
-                buf_printf(&buf, "\n#line %d \"%s\"", d->end_line, d->end_file);
-            else
-                buf_printf(&buf, "\n#line %d", d->end_line);
+            if (d->variant_count < 0) {
+                /* Forward declaration */
+                buf_printf(&buf, "typedef struct %s %s;", d->name, d->name);
+            } else {
+                emit_descr(&buf, d);
+                if (d->end_file)
+                    buf_printf(&buf, "\n#line %d \"%s\"", d->end_line, d->end_file);
+                else
+                    buf_printf(&buf, "\n#line %d", d->end_line);
+            }
             break;
         }
         case CHUNK_MATCH_DESCR:

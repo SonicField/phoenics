@@ -20,7 +20,7 @@ typedef struct {
     char _empty;
 } Color_Blue_t;
 
-typedef struct {
+typedef struct Color {
     Color_Tag tag;
     union {
         Color_Red_t Red;
@@ -82,7 +82,7 @@ typedef struct {
     const char *s;
 } Value_String_t;
 
-typedef struct {
+typedef struct Value {
     Value_Tag tag;
     union {
         Value_Integer_t Integer;

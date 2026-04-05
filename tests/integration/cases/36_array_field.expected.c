@@ -16,7 +16,7 @@ typedef struct {
     char _empty;
 } Data_Empty_t;
 
-typedef struct {
+typedef struct Data {
     Data_Tag tag;
     union {
         Data_Buffer_t Buffer;

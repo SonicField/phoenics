@@ -15,7 +15,7 @@ typedef struct {
     int y;
 } Val_B_t;
 
-typedef struct {
+typedef struct Val {
     Val_Tag tag;
     union {
         Val_A_t A;

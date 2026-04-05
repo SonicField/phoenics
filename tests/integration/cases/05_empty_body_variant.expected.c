@@ -13,7 +13,7 @@ typedef struct {
     char _empty;
 } Maybe_int_Nothing_t;
 
-typedef struct {
+typedef struct Maybe_int {
     Maybe_int_Tag tag;
     union {
         Maybe_int_Just_t Just;

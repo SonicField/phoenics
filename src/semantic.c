@@ -30,11 +30,17 @@ SemanticResult analyse(const Program *prog,
     for (int i = 0; i < prog->descr_count; i++) {
         const DescrDecl *d = &prog->descrs[i];
         sr.descr_types[i].name = d->name;
-        sr.descr_types[i].variant_count = d->variant_count;
-        sr.descr_types[i].variant_names =
-            calloc((size_t)d->variant_count, sizeof(const char *));
-        for (int j = 0; j < d->variant_count; j++) {
-            sr.descr_types[i].variant_names[j] = d->variants[j].name;
+        if (d->variant_count < 0) {
+            /* Forward declaration — no variants */
+            sr.descr_types[i].variant_count = -1;
+            sr.descr_types[i].variant_names = NULL;
+        } else {
+            sr.descr_types[i].variant_count = d->variant_count;
+            sr.descr_types[i].variant_names =
+                calloc((size_t)d->variant_count, sizeof(const char *));
+            for (int j = 0; j < d->variant_count; j++) {
+                sr.descr_types[i].variant_names[j] = d->variants[j].name;
+            }
         }
     }
 
@@ -51,10 +57,13 @@ SemanticResult analyse(const Program *prog,
         }
     }
 
-    /* Check for duplicate descr names (local + external) */
+    /* Check for duplicate descr names (local + external).
+     * Allow forward declaration + full definition of the same name. */
     for (int i = 0; i < sr.descr_type_count && !sr.error; i++) {
         for (int j = i + 1; j < sr.descr_type_count && !sr.error; j++) {
             if (strcmp(sr.descr_types[i].name, sr.descr_types[j].name) == 0) {
+                if (sr.descr_types[i].variant_count < 0 || sr.descr_types[j].variant_count < 0)
+                    continue; /* forward decl + full def is OK */
                 sem_error(&sr, "duplicate phc_descr type '%s'", sr.descr_types[i].name);
             }
         }
@@ -88,6 +97,10 @@ SemanticResult analyse(const Program *prog,
         }
         if (!dt) {
             sem_error(&sr, "unknown phc_descr type '%s'", m->type_name);
+            break;
+        }
+        if (dt->variant_count < 0) {
+            sem_error(&sr, "cannot match on forward-declared type '%s'", m->type_name);
             break;
         }
 

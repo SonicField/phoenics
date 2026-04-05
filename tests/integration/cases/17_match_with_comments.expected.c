@@ -15,7 +15,7 @@ typedef struct {
     const char *s;
 } Val_Str_t;
 
-typedef struct {
+typedef struct Val {
     Val_Tag tag;
     union {
         Val_Int_t Int;

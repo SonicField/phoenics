@@ -16,7 +16,7 @@ typedef struct {
     const char *message;
 } Result_Err_t;
 
-typedef struct {
+typedef struct Result {
     Result_Tag tag;
     union {
         Result_Ok_t Ok;

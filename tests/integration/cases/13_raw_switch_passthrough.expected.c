@@ -20,7 +20,7 @@ typedef struct {
     char _empty;
 } Color_Blue_t;
 
-typedef struct {
+typedef struct Color {
     Color_Tag tag;
     union {
         Color_Red_t Red;

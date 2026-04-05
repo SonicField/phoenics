@@ -15,7 +15,7 @@ typedef struct {
     int value;
 } Handler_Direct_t;
 
-typedef struct {
+typedef struct Handler {
     Handler_Tag tag;
     union {
         Handler_Callback_t Callback;

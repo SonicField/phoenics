@@ -16,7 +16,7 @@ typedef struct {
     double height;
 } Shape_Rectangle_t;
 
-typedef struct {
+typedef struct Shape {
     Shape_Tag tag;
     union {
         Shape_Circle_t Circle;

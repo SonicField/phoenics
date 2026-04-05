@@ -26,7 +26,7 @@ typedef struct {
     int y;
 } Value_Pair_t;
 
-typedef struct {
+typedef struct Value {
     Value_Tag tag;
     union {
         Value_IntPtr_t IntPtr;

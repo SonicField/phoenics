@@ -8,7 +8,7 @@ typedef struct {
     int x;
 } Wrapper_Value_t;
 
-typedef struct {
+typedef struct Wrapper {
     Wrapper_Tag tag;
     union {
         Wrapper_Value_t Value;

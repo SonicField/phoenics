@@ -1,0 +1,8 @@
+phc_descr Foo;
+
+void f(int x) {
+    Foo dummy;
+    phc_match(Foo, dummy) {
+        case A: {} break;
+    }
+}
