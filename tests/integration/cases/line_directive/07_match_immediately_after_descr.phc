@@ -1,0 +1,11 @@
+phc_descr Val {
+    A { int x; },
+    B { int y; }
+};
+void f(Val v) {
+    phc_match(Val, v) {
+        case A: { } break;
+        case B: { } break;
+    }
+    int z = IMMEDIATELY_AFTER_MATCH_ERROR;
+}

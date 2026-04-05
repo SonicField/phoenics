@@ -48,8 +48,7 @@ static inline Result_Err_t Result_as_Err(Result v) {
     if (v.tag != Result_Err) abort();
     return v.Err;
 }
-#line 6
-
+#line 7
 
 int main(void) {
     Result r = Result_mk_Ok(42);
@@ -63,6 +62,5 @@ int main(void) {
             default: break;
     }
 #line 18
-
     return 0;
 }

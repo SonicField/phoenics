@@ -1,0 +1,11 @@
+/* This is a
+   multi-line comment
+   that spans several lines
+   before the descr declaration */
+
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; }
+};
+
+int x = AFTER_MULTILINE_COMMENT_ERROR;

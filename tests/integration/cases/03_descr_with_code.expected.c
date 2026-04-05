@@ -45,8 +45,7 @@ static inline Option_int_None_t Option_int_as_None(Option_int v) {
     if (v.tag != Option_int_None) abort();
     return v.None;
 }
-#line 6
-
+#line 7
 
 int main(void) {
     Option_int x = Option_int_mk_Some(42);
@@ -60,6 +59,5 @@ int main(void) {
             default: break;
     }
 #line 18
-
     return 0;
 }

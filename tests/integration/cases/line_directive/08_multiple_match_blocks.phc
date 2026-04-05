@@ -1,0 +1,16 @@
+phc_descr Color {
+    Red {},
+    Blue {}
+};
+
+void f(Color c) {
+    phc_match(Color, c) {
+        case Red: { } break;
+        case Blue: { } break;
+    }
+    phc_match(Color, c) {
+        case Red: { } break;
+        case Blue: { } break;
+    }
+    int w = AFTER_SECOND_MATCH_ERROR;
+}

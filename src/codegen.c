@@ -184,11 +184,11 @@ char *codegen(const Program *prog) {
             break;
         case CHUNK_DESCR:
             emit_descr(&buf, &prog->descrs[c->descr_index]);
-            buf_printf(&buf, "\n#line %d\n", prog->descrs[c->descr_index].end_line);
+            buf_printf(&buf, "\n#line %d", prog->descrs[c->descr_index].end_line);
             break;
         case CHUNK_MATCH_DESCR:
             emit_match_descr(&buf, prog, &c->match);
-            buf_printf(&buf, "\n#line %d\n", c->match.end_line);
+            buf_printf(&buf, "\n#line %d", c->match.end_line);
             break;
         }
     }

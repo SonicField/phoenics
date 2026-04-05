@@ -66,5 +66,4 @@ static inline Shape_Triangle_t Shape_as_Triangle(Shape v) {
     if (v.tag != Shape_Triangle) abort();
     return v.Triangle;
 }
-#line 5
-
+#line 6
