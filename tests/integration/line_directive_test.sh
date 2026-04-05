@@ -36,48 +36,53 @@ if [ ! -d "$CASES_DIR" ]; then
     exit 0
 fi
 
-for input_file in "$CASES_DIR"/*.phc; do
-    [ -f "$input_file" ] || continue
-
-    base="$(basename "$input_file" .phc)"
-    expected_line_file="$CASES_DIR/${base}.expected_line"
-
-    if [ ! -f "$expected_line_file" ]; then
-        continue
-    fi
+run_test() {
+    local input_file="$1"
+    local expected_line="$2"
+    local mode="$3"  # "direct" or "pipeline"
+    local base="$4"
+    local suffix=""
+    [ "$mode" = "pipeline" ] && suffix=" [pipeline]"
 
     TOTAL=$((TOTAL + 1))
-    printf "  %-40s " "$base"
+    printf "  %-40s " "${base}${suffix}"
 
-    expected_line="$(cat "$expected_line_file" | tr -d '[:space:]')"
+    phc_out="$TMPDIR/${base}_${mode}.c"
 
-    # Step 1: Run phc
-    phc_out="$TMPDIR/${base}.c"
-    if ! "$PHC" < "$input_file" > "$phc_out" 2>"$TMPDIR/${base}.phc_err"; then
-        echo "FAIL (phc rejected input)"
-        cat "$TMPDIR/${base}.phc_err" | sed 's/^/    /'
-        FAIL=$((FAIL + 1))
-        continue
+    if [ "$mode" = "pipeline" ]; then
+        # Pipeline: cc -E | phc | cc
+        if ! $CC -x c -E "$input_file" 2>/dev/null | "$PHC" > "$phc_out" 2>"$TMPDIR/${base}_${mode}.phc_err"; then
+            echo "FAIL (phc rejected pipeline input)"
+            cat "$TMPDIR/${base}_${mode}.phc_err" | sed 's/^/    /'
+            FAIL=$((FAIL + 1))
+            return
+        fi
+    else
+        # Direct: phc only
+        if ! "$PHC" < "$input_file" > "$phc_out" 2>"$TMPDIR/${base}_${mode}.phc_err"; then
+            echo "FAIL (phc rejected input)"
+            cat "$TMPDIR/${base}_${mode}.phc_err" | sed 's/^/    /'
+            FAIL=$((FAIL + 1))
+            return
+        fi
     fi
 
-    # Step 2: Compile — expect failure (deliberate error in source)
-    compile_err="$TMPDIR/${base}.cc_err"
+    # Compile — expect failure (deliberate error in source)
+    compile_err="$TMPDIR/${base}_${mode}.cc_err"
     if $CC $CFLAGS -c -o /dev/null "$phc_out" 2>"$compile_err"; then
         echo "FAIL (compilation succeeded — deliberate error not triggered)"
         FAIL=$((FAIL + 1))
-        continue
+        return
     fi
 
-    # Step 3: Extract line number from compiler error
-    # clang format: "file.c:LINE:COL: error: ..."
-    # gcc format:   "file.c:LINE:COL: error: ..."
+    # Extract line number from compiler error
     actual_line=$(head -1 "$compile_err" | sed -n 's/^[^:]*:\([0-9]*\):.*/\1/p')
 
     if [ -z "$actual_line" ]; then
         echo "FAIL (could not parse compiler error line number)"
         echo "    Compiler output: $(head -1 "$compile_err")"
         FAIL=$((FAIL + 1))
-        continue
+        return
     fi
 
     if [ "$actual_line" = "$expected_line" ]; then
@@ -87,6 +92,32 @@ for input_file in "$CASES_DIR"/*.phc; do
         echo "FAIL (expected line $expected_line, got line $actual_line)"
         echo "    Compiler error: $(head -1 "$compile_err")"
         FAIL=$((FAIL + 1))
+    fi
+}
+
+for input_file in "$CASES_DIR"/*.phc; do
+    [ -f "$input_file" ] || continue
+
+    base="$(basename "$input_file" .phc)"
+
+    # Direct-mode test
+    expected_line_file="$CASES_DIR/${base}.expected_line"
+    if [ -f "$expected_line_file" ]; then
+        expected_line="$(cat "$expected_line_file" | tr -d '[:space:]')"
+        run_test "$input_file" "$expected_line" "direct" "$base"
+    fi
+
+    # Pipeline-mode test (non-blocking — known limitation until V3 P2)
+    pipeline_line_file="$CASES_DIR/${base}.pipeline_expected_line"
+    if [ -f "$pipeline_line_file" ]; then
+        expected_line="$(cat "$pipeline_line_file" | tr -d '[:space:]')"
+        old_fail=$FAIL
+        run_test "$input_file" "$expected_line" "pipeline" "$base"
+        if [ $FAIL -gt $old_fail ]; then
+            # Pipeline failure is expected until P2 — don't block the gate
+            FAIL=$old_fail
+            PIPELINE_KNOWN=$((${PIPELINE_KNOWN:-0} + 1))
+        fi
     fi
 done
 
