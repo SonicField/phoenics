@@ -244,14 +244,12 @@ char *codegen(const Program *prog,
         case CHUNK_RETURN: {
             /* Emit defer cleanup inline (reverse order), then actual return */
             int n = c->ret.defer_count;
-            /* Collect defer bodies by walking backward through chunks */
-            const char *bodies[64];
+            const char **bodies = calloc((size_t)n, sizeof(const char *));
             int found = 0;
             for (int j = i - 1; j >= 0 && found < n; j--) {
                 if (prog->chunks[j].type == CHUNK_DEFER)
                     bodies[found++] = prog->chunks[j].defer.body_text;
             }
-            /* Emit in reverse order (most recent defer first) */
             buf_append(&buf, "{ ");
             for (int d = 0; d < found; d++) {
                 if (bodies[d]) {
@@ -263,12 +261,12 @@ char *codegen(const Program *prog,
                 buf_printf(&buf, "return %s; }", c->ret.expr);
             else
                 buf_append(&buf, "return; }");
+            free(bodies);
             break;
         }
         case CHUNK_FUNC_END: {
-            /* Emit defer cleanup for implicit function end (fall-through) */
             int n = c->func_end.defer_count;
-            const char *bodies[64];
+            const char **bodies = calloc((size_t)n, sizeof(const char *));
             int found = 0;
             for (int j = i - 1; j >= 0 && found < n; j--) {
                 if (prog->chunks[j].type == CHUNK_DEFER)
@@ -280,6 +278,7 @@ char *codegen(const Program *prog,
                     buf_append(&buf, "\n");
                 }
             }
+            free(bodies);
             break;
         }
         }
