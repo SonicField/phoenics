@@ -13,7 +13,7 @@ TEST(codegen_tag_enum) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "typedef enum {"));
     ASSERT(contains(out, "Shape_Circle"));
@@ -29,7 +29,7 @@ TEST(codegen_struct_with_union) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "typedef struct {"));
     ASSERT(contains(out, "Shape_Tag tag;"));
@@ -46,7 +46,7 @@ TEST(codegen_constructor_functions) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "static inline Shape Shape_mk_Circle(double radius)"));
     ASSERT(contains(out, "_v.tag = Shape_Circle;"));
@@ -62,7 +62,7 @@ TEST(codegen_empty_variant_constructor) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "static inline Option Option_mk_None(void)"));
     ASSERT(contains(out, "Option_None_t None;"));
@@ -76,7 +76,7 @@ TEST(codegen_passthrough_preserved) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "#include <stdio.h>"));
     ASSERT(contains(out, "int main(void) { return 0; }"));
@@ -92,7 +92,7 @@ TEST(codegen_multiple_descrs) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "A_Tag"));
     ASSERT(contains(out, "B_Tag"));
@@ -108,7 +108,7 @@ TEST(codegen_multi_field_constructor) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "P_mk_Point(int x, int y, int z)"));
     ASSERT(contains(out, "_v.Point.x = x;"));
@@ -128,7 +128,7 @@ TEST(codegen_descr_between_code_ordering) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
 
     /* #include must appear before the typedef */
@@ -152,7 +152,7 @@ TEST(codegen_count_sentinel) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     ASSERT(contains(out, "Shape__COUNT"));
 
@@ -172,7 +172,7 @@ TEST(codegen_match_descr_generates_switch) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     /* match_descr should generate a standard switch on .tag */
     ASSERT(contains(out, "switch (s.tag)"));
@@ -196,7 +196,7 @@ TEST(codegen_match_descr_preserves_body) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     /* Case bodies should be preserved in the output */
     ASSERT(contains(out, "v.A.x"));
@@ -213,7 +213,7 @@ TEST(codegen_safe_accessor_generated) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     /* Should generate Shape_as_Circle accessor */
     ASSERT(contains(out, "Shape_as_Circle"));
@@ -231,7 +231,7 @@ TEST(codegen_safe_accessor_empty_variant) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     /* Even empty variants get accessors (for tag checking) */
     ASSERT(contains(out, "Option_as_Some"));
@@ -246,7 +246,7 @@ TEST(codegen_safe_accessor_returns_pointer) {
     ParseResult pr = parse(src);
     ASSERT_EQ(pr.error, 0);
 
-    char *out = codegen(&pr.program);
+    char *out = codegen(&pr.program, NULL, 0);
     ASSERT_NOT_NULL(out);
     /* Accessor function checks tag then returns variant struct */
     ASSERT(contains(out, "V_A_t V_as_A("));

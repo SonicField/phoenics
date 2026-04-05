@@ -7,6 +7,9 @@ typedef struct {
     const char *name;
     int variant_count;
     const char **variant_names;
+    /* Field info per variant (NULL if unavailable, e.g., v1 manifest) */
+    Field **variant_fields;     /* array of Field arrays, one per variant */
+    int *variant_field_counts;  /* field count per variant */
 } DescrType;
 
 typedef struct {

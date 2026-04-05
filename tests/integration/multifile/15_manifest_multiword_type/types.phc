@@ -1,0 +1,4 @@
+phc_descr Counter {
+    Small { unsigned long count; },
+    Big { unsigned long long value; }
+};

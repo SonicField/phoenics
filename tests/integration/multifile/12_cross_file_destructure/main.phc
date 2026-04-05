@@ -1,0 +1,15 @@
+#include <stdio.h>
+#include "shapes.h"
+
+int main(void) {
+    Shape s = Shape_mk_Circle(3.14);
+    phc_match(Shape, s) {
+        case Circle(radius): {
+            printf("radius=%g\n", radius);
+        } break;
+        case Rectangle(width, height): {
+            printf("rect %gx%g\n", width, height);
+        } break;
+    }
+    return 0;
+}

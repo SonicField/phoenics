@@ -32,7 +32,7 @@ static int emit_type_manifest(const char *path, const Program *prog) {
         fprintf(stderr, "phc: error: cannot open '%s' for writing\n", path);
         return 0;
     }
-    fprintf(f, "# phc type manifest v1 — machine generated, do not edit\n");
+    fprintf(f, "# phc type manifest v2 — machine generated, do not edit\n");
     for (int i = 0; i < prog->descr_count; i++) {
         const DescrDecl *d = &prog->descrs[i];
         fprintf(f, "descr %s", d->name);
@@ -40,6 +40,14 @@ static int emit_type_manifest(const char *path, const Program *prog) {
             fprintf(f, " %s", d->variants[j].name);
         }
         fprintf(f, "\n");
+        /* Emit field lines for each variant */
+        for (int j = 0; j < d->variant_count; j++) {
+            const Variant *v = &d->variants[j];
+            for (int k = 0; k < v->field_count; k++) {
+                fprintf(f, "field %s %s %s %s\n",
+                        d->name, v->name, v->fields[k].type_name, v->fields[k].field_name);
+            }
+        }
     }
     fclose(f);
     return 1;
@@ -59,49 +67,105 @@ static int load_type_manifest(const char *path,
         /* Skip comments and blank lines */
         if (line[0] == '#' || line[0] == '\n' || line[0] == '\0') continue;
 
-        /* Expect: descr TypeName Variant1 Variant2 ... */
         char *saveptr = NULL;
         char *tok = strtok_r(line, " \t\n", &saveptr);
-        if (!tok || strcmp(tok, "descr") != 0) {
+        if (!tok) continue;
+
+        if (strcmp(tok, "descr") == 0) {
+            tok = strtok_r(NULL, " \t\n", &saveptr);
+            if (!tok) {
+                fprintf(stderr, "phc: error: missing type name in manifest '%s'\n", path);
+                free(line);
+                fclose(f);
+                return 0;
+            }
+
+            DescrType dt;
+            memset(&dt, 0, sizeof(dt));
+            dt.name = strdup(tok);
+
+            int vcap = 0;
+            while ((tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
+                if (dt.variant_count >= vcap) {
+                    vcap = vcap ? vcap * 2 : 8;
+                    dt.variant_names = realloc(dt.variant_names,
+                                               sizeof(const char *) * (size_t)vcap);
+                }
+                dt.variant_names[dt.variant_count++] = strdup(tok);
+            }
+
+            if (dt.variant_count == 0) {
+                fprintf(stderr, "phc: error: type '%s' has no variants in manifest '%s'\n",
+                        dt.name, path);
+                free((void *)dt.name);
+                free(line);
+                fclose(f);
+                return 0;
+            }
+
+            if (*count >= *cap) {
+                *cap = *cap ? *cap * 2 : 8;
+                *types = realloc(*types, sizeof(DescrType) * (size_t)*cap);
+            }
+            (*types)[(*count)++] = dt;
+
+        } else if (strcmp(tok, "field") == 0) {
+            /* field TypeName VariantName type_tokens... field_name */
+            char *type_name = strtok_r(NULL, " \t\n", &saveptr);
+            char *variant_name = strtok_r(NULL, " \t\n", &saveptr);
+            if (!type_name || !variant_name) continue;
+
+            /* Collect remaining tokens: all but last are type, last is field name */
+            char *tokens[64];
+            int ntok = 0;
+            while ((tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL && ntok < 64) {
+                tokens[ntok++] = tok;
+            }
+            if (ntok < 2) continue; /* need at least type + name */
+
+            /* Find the DescrType for this type_name */
+            DescrType *dt = NULL;
+            for (int i = *count - 1; i >= 0; i--) {
+                if (strcmp((*types)[i].name, type_name) == 0) {
+                    dt = &(*types)[i];
+                    break;
+                }
+            }
+            if (!dt) continue;
+
+            /* Find variant index */
+            int vi = -1;
+            for (int i = 0; i < dt->variant_count; i++) {
+                if (strcmp(dt->variant_names[i], variant_name) == 0) {
+                    vi = i;
+                    break;
+                }
+            }
+            if (vi < 0) continue;
+
+            /* Allocate variant_fields/counts arrays if needed */
+            if (!dt->variant_fields) {
+                dt->variant_fields = calloc((size_t)dt->variant_count, sizeof(Field *));
+                dt->variant_field_counts = calloc((size_t)dt->variant_count, sizeof(int));
+            }
+
+            /* Build type string from tokens[0..ntok-2], field name is tokens[ntok-1] */
+            char type_buf[256] = {0};
+            for (int i = 0; i < ntok - 1; i++) {
+                if (i > 0) strcat(type_buf, " ");
+                strcat(type_buf, tokens[i]);
+            }
+
+            int fc = dt->variant_field_counts[vi];
+            dt->variant_fields[vi] = realloc(dt->variant_fields[vi],
+                                              sizeof(Field) * (size_t)(fc + 1));
+            dt->variant_fields[vi][fc].type_name = strdup(type_buf);
+            dt->variant_fields[vi][fc].field_name = strdup(tokens[ntok - 1]);
+            dt->variant_field_counts[vi] = fc + 1;
+
+        } else {
             continue; /* Skip unknown keywords for forward-compatibility */
         }
-
-        tok = strtok_r(NULL, " \t\n", &saveptr);
-        if (!tok) {
-            fprintf(stderr, "phc: error: missing type name in manifest '%s'\n", path);
-            free(line);
-            fclose(f);
-            return 0;
-        }
-
-        DescrType dt;
-        memset(&dt, 0, sizeof(dt));
-        dt.name = strdup(tok);
-
-        int vcap = 0;
-        while ((tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
-            if (dt.variant_count >= vcap) {
-                vcap = vcap ? vcap * 2 : 8;
-                dt.variant_names = realloc(dt.variant_names,
-                                           sizeof(const char *) * (size_t)vcap);
-            }
-            dt.variant_names[dt.variant_count++] = strdup(tok);
-        }
-
-        if (dt.variant_count == 0) {
-            fprintf(stderr, "phc: error: type '%s' has no variants in manifest '%s'\n",
-                    dt.name, path);
-            free((void *)dt.name);
-            free(line);
-            fclose(f);
-            return 0;
-        }
-
-        if (*count >= *cap) {
-            *cap = *cap ? *cap * 2 : 8;
-            *types = realloc(*types, sizeof(DescrType) * (size_t)*cap);
-        }
-        (*types)[(*count)++] = dt;
     }
     free(line);
     fclose(f);
@@ -118,6 +182,17 @@ static void free_external_types(DescrType *types, int count) {
             free((void *)types[i].variant_names[j]);
         }
         free(types[i].variant_names);
+        if (types[i].variant_fields) {
+            for (int j = 0; j < types[i].variant_count; j++) {
+                for (int k = 0; k < types[i].variant_field_counts[j]; k++) {
+                    free(types[i].variant_fields[j][k].type_name);
+                    free(types[i].variant_fields[j][k].field_name);
+                }
+                free(types[i].variant_fields[j]);
+            }
+            free(types[i].variant_fields);
+            free(types[i].variant_field_counts);
+        }
     }
     free(types);
 }
@@ -196,7 +271,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    char *output = codegen(&result.program);
+    char *output = codegen(&result.program, external_types, external_count);
     /* Free semantic result BEFORE external types: analyse() copies name
      * pointers (not strings) from external_types into its type table,
      * and semantic_result_free() frees the pointer arrays but not the

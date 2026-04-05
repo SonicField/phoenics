@@ -95,21 +95,60 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
 
 /* --- match_descr codegen --- */
 
-/* Find a variant in a DescrDecl by name, return NULL if not found */
-static const Variant *find_variant(const DescrDecl *descrs, int descr_count,
-                                   const char *type_name, const char *variant_name) {
-    for (int i = 0; i < descr_count; i++) {
-        if (strcmp(descrs[i].name, type_name) != 0) continue;
-        for (int j = 0; j < descrs[i].variant_count; j++) {
-            if (strcmp(descrs[i].variants[j].name, variant_name) == 0)
-                return &descrs[i].variants[j];
-        }
+/* Find a field's type in a variant by field name */
+static const char *find_field_type(const Field *fields, int field_count,
+                                   const char *field_name) {
+    for (int i = 0; i < field_count; i++) {
+        if (strcmp(fields[i].field_name, field_name) == 0)
+            return fields[i].type_name;
     }
     return NULL;
 }
 
+/* Emit binding declarations for a destructured case.
+ * Searches local descrs first, then external types. */
+static void emit_bindings(Buffer *buf, const MatchDescr *m, const MatchCase *mc,
+                           const DescrDecl *descrs, int descr_count,
+                           const DescrType *ext_types, int ext_count) {
+    /* Try local descrs first */
+    for (int i = 0; i < descr_count; i++) {
+        if (strcmp(descrs[i].name, m->type_name) != 0) continue;
+        for (int vi = 0; vi < descrs[i].variant_count; vi++) {
+            if (strcmp(descrs[i].variants[vi].name, mc->variant_name) != 0) continue;
+            const Variant *v = &descrs[i].variants[vi];
+            for (int b = 0; b < mc->binding_count; b++) {
+                const char *type = find_field_type(v->fields, v->field_count, mc->bindings[b]);
+                if (type)
+                    buf_printf(buf, " %s %s = %s.%s.%s;",
+                               type, mc->bindings[b], m->expr_text,
+                               mc->variant_name, mc->bindings[b]);
+            }
+            return;
+        }
+    }
+    /* Try external types */
+    for (int i = 0; i < ext_count; i++) {
+        if (strcmp(ext_types[i].name, m->type_name) != 0) continue;
+        if (!ext_types[i].variant_fields) return;
+        for (int vi = 0; vi < ext_types[i].variant_count; vi++) {
+            if (strcmp(ext_types[i].variant_names[vi], mc->variant_name) != 0) continue;
+            Field *fields = ext_types[i].variant_fields[vi];
+            int fc = ext_types[i].variant_field_counts[vi];
+            for (int b = 0; b < mc->binding_count; b++) {
+                const char *type = find_field_type(fields, fc, mc->bindings[b]);
+                if (type)
+                    buf_printf(buf, " %s %s = %s.%s.%s;",
+                               type, mc->bindings[b], m->expr_text,
+                               mc->variant_name, mc->bindings[b]);
+            }
+            return;
+        }
+    }
+}
+
 static void emit_match_descr(Buffer *buf, const MatchDescr *m,
-                              const DescrDecl *descrs, int descr_count) {
+                              const DescrDecl *descrs, int descr_count,
+                              const DescrType *ext_types, int ext_count) {
     buf_append(buf, "switch (");
     buf_append(buf, m->expr_text);
     buf_append(buf, ".tag) {\n");
@@ -118,22 +157,8 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
         const MatchCase *mc = &m->cases[i];
 
         if (mc->binding_count > 0) {
-            const Variant *v = find_variant(descrs, descr_count,
-                                            m->type_name, mc->variant_name);
-            /* Emit: case Type_Variant: { bindings; body_text_content } break; */
             buf_printf(buf, "    case %s_%s: {", m->type_name, mc->variant_name);
-            for (int b = 0; b < mc->binding_count; b++) {
-                /* Find the field type for this binding */
-                for (int fi = 0; fi < v->field_count; fi++) {
-                    if (strcmp(v->fields[fi].field_name, mc->bindings[b]) == 0) {
-                        buf_printf(buf, " %s %s = %s.%s.%s;",
-                                   v->fields[fi].type_name, mc->bindings[b],
-                                   m->expr_text, mc->variant_name, mc->bindings[b]);
-                        break;
-                    }
-                }
-            }
-            /* Emit body_text (which starts with '{') inside the outer braces */
+            emit_bindings(buf, m, mc, descrs, descr_count, ext_types, ext_count);
             buf_printf(buf, " %s }\n", mc->body_text);
         } else {
             buf_printf(buf, "    case %s_%s: %s\n",
@@ -147,7 +172,8 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
 
 /* --- Main codegen --- */
 
-char *codegen(const Program *prog) {
+char *codegen(const Program *prog,
+              const DescrType *external_types, int external_type_count) {
     Buffer buf;
     buf_init(&buf);
 
@@ -170,7 +196,8 @@ char *codegen(const Program *prog) {
             buf_printf(&buf, "\n#line %d", prog->descrs[c->descr_index].end_line);
             break;
         case CHUNK_MATCH_DESCR:
-            emit_match_descr(&buf, &c->match, prog->descrs, prog->descr_count);
+            emit_match_descr(&buf, &c->match, prog->descrs, prog->descr_count,
+                            external_types, external_type_count);
             buf_printf(&buf, "\n#line %d", c->match.end_line);
             break;
         }

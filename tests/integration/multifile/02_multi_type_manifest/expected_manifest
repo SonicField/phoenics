@@ -1,3 +1,7 @@
-# phc type manifest v1 — machine generated, do not edit
+# phc type manifest v2 — machine generated, do not edit
 descr Shape Circle Rectangle
+field Shape Circle double radius
+field Shape Rectangle double width
+field Shape Rectangle double height
 descr Color Red Green Blue
+field Color Blue int intensity

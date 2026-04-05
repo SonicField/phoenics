@@ -121,23 +121,6 @@ SemanticResult analyse(const Program *prog,
             const MatchCase *mc = &m->cases[i];
             if (mc->binding_count == 0) continue;
 
-            /* Find the DescrDecl and variant (local types only) */
-            const Variant *variant = NULL;
-            for (int di = 0; di < prog->descr_count && !variant; di++) {
-                if (strcmp(prog->descrs[di].name, m->type_name) != 0) continue;
-                for (int vi = 0; vi < prog->descrs[di].variant_count; vi++) {
-                    if (strcmp(prog->descrs[di].variants[vi].name, mc->variant_name) == 0) {
-                        variant = &prog->descrs[di].variants[vi];
-                        break;
-                    }
-                }
-            }
-            if (!variant) {
-                sem_error(&sr, "cannot destructure external type '%s' (field info not available)",
-                          m->type_name);
-                break;
-            }
-
             /* Check for duplicate bindings */
             for (int b1 = 0; b1 < mc->binding_count && !sr.error; b1++) {
                 for (int b2 = b1 + 1; b2 < mc->binding_count && !sr.error; b2++) {
@@ -148,11 +131,44 @@ SemanticResult analyse(const Program *prog,
                 }
             }
 
+            /* Find fields: try local descr first, then external types */
+            const Field *fields = NULL;
+            int field_count = 0;
+            for (int di = 0; di < prog->descr_count && !fields; di++) {
+                if (strcmp(prog->descrs[di].name, m->type_name) != 0) continue;
+                for (int vi = 0; vi < prog->descrs[di].variant_count; vi++) {
+                    if (strcmp(prog->descrs[di].variants[vi].name, mc->variant_name) == 0) {
+                        fields = prog->descrs[di].variants[vi].fields;
+                        field_count = prog->descrs[di].variants[vi].field_count;
+                        break;
+                    }
+                }
+            }
+            if (!fields) {
+                /* Try external types */
+                for (int ei = 0; ei < external_type_count && !fields; ei++) {
+                    if (strcmp(external_types[ei].name, m->type_name) != 0) continue;
+                    if (!external_types[ei].variant_fields) {
+                        sem_error(&sr, "cannot destructure external type '%s' (field info not available — regenerate manifest with current phc)",
+                                  m->type_name);
+                        break;
+                    }
+                    for (int vi = 0; vi < external_types[ei].variant_count; vi++) {
+                        if (strcmp(external_types[ei].variant_names[vi], mc->variant_name) == 0) {
+                            fields = external_types[ei].variant_fields[vi];
+                            field_count = external_types[ei].variant_field_counts[vi];
+                            break;
+                        }
+                    }
+                }
+            }
+            if (sr.error) break;
+
             /* Check each binding name exists as a field */
             for (int b = 0; b < mc->binding_count && !sr.error; b++) {
                 int found = 0;
-                for (int fi = 0; fi < variant->field_count; fi++) {
-                    if (strcmp(mc->bindings[b], variant->fields[fi].field_name) == 0) {
+                for (int fi = 0; fi < field_count; fi++) {
+                    if (strcmp(mc->bindings[b], fields[fi].field_name) == 0) {
                         found = 1;
                         break;
                     }
