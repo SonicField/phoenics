@@ -137,8 +137,15 @@ static void emit_bindings(Buffer *buf, const MatchDescr *m, const MatchCase *mc,
             for (int b = 0; b < mc->binding_count; b++) {
                 const char *type = find_field_type(fields, fc, mc->bindings[b]);
                 if (!type) continue;
-                /* Check if type already contains the field name (function pointers) */
-                if (strstr(type, mc->bindings[b]))
+                /* Function pointer types embed the name as (*name).
+                 * Detect this pattern and emit the type directly as a
+                 * declaration (it already contains the name). */
+                char needle[256];
+                int is_fnptr = 0;
+                if (snprintf(needle, sizeof(needle), "(*%s)", mc->bindings[b]) < (int)sizeof(needle)) {
+                    is_fnptr = strstr(type, needle) != NULL;
+                }
+                if (is_fnptr)
                     buf_printf(buf, " %s = %s.%s.%s;",
                                type, m->expr_text,
                                mc->variant_name, mc->bindings[b]);
