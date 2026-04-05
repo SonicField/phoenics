@@ -1,0 +1,17 @@
+#include <stdio.h>
+#include "handlers.h"
+
+static void printer(int x) { printf("called: %d\n", x); }
+
+int main(void) {
+    Handler h = Handler_mk_Callback(printer);
+    phc_match(Handler, h) {
+        case Callback(func): {
+            func(42);
+        } break;
+        case Direct(value): {
+            printf("direct: %d\n", value);
+        } break;
+    }
+    return 0;
+}

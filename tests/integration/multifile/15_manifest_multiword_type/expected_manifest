@@ -1,4 +1,4 @@
 # phc type manifest v2 — machine generated, do not edit
 descr Counter Small Big
-field Counter Small unsigned long count
-field Counter Big unsigned long long value
+field Counter Small count unsigned long
+field Counter Big value unsigned long long

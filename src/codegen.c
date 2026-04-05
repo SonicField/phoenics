@@ -136,7 +136,13 @@ static void emit_bindings(Buffer *buf, const MatchDescr *m, const MatchCase *mc,
             int fc = ext_types[i].variant_field_counts[vi];
             for (int b = 0; b < mc->binding_count; b++) {
                 const char *type = find_field_type(fields, fc, mc->bindings[b]);
-                if (type)
+                if (!type) continue;
+                /* Check if type already contains the field name (function pointers) */
+                if (strstr(type, mc->bindings[b]))
+                    buf_printf(buf, " %s = %s.%s.%s;",
+                               type, m->expr_text,
+                               mc->variant_name, mc->bindings[b]);
+                else
                     buf_printf(buf, " %s %s = %s.%s.%s;",
                                type, mc->bindings[b], m->expr_text,
                                mc->variant_name, mc->bindings[b]);

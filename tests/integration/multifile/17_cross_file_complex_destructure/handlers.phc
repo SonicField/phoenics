@@ -1,0 +1,4 @@
+phc_descr Handler {
+    Callback { void (*func)(int); },
+    Direct { int value; }
+};

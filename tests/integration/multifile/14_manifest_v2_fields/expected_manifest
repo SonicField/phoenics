@@ -1,5 +1,5 @@
 # phc type manifest v2 — machine generated, do not edit
 descr Shape Circle Rectangle
-field Shape Circle double radius
-field Shape Rectangle double width
-field Shape Rectangle double height
+field Shape Circle radius double
+field Shape Rectangle width double
+field Shape Rectangle height double

@@ -1,4 +1,4 @@
 # phc type manifest v2 — machine generated, do not edit
 descr Wrapper Ptr Simple
-field Wrapper Ptr const unsigned long long * value
-field Wrapper Simple int x
+field Wrapper Ptr value const unsigned long long *
+field Wrapper Simple x int
