@@ -1,0 +1,4 @@
+phc_descr Wrapper {
+    Ptr { const unsigned long long *value; },
+    Simple { int x; }
+};
