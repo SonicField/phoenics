@@ -44,8 +44,15 @@ static int emit_type_manifest(const char *path, const Program *prog) {
         for (int j = 0; j < d->variant_count; j++) {
             const Variant *v = &d->variants[j];
             for (int k = 0; k < v->field_count; k++) {
-                fprintf(f, "field %s %s %s %s\n",
-                        d->name, v->name, v->fields[k].type_name, v->fields[k].field_name);
+                const Field *fld = &v->fields[k];
+                if (fld->type_name) {
+                    fprintf(f, "field %s %s %s %s\n",
+                            d->name, v->name, fld->type_name, fld->field_name);
+                } else {
+                    /* Complex types: emit raw_decl (last token is field name) */
+                    fprintf(f, "field %s %s %s\n",
+                            d->name, v->name, fld->raw_decl);
+                }
             }
         }
     }
