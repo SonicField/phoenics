@@ -89,5 +89,10 @@ test-asan: clean
 	@echo "=== ASan Build + Test ==="
 	$(MAKE) test CFLAGS="-std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -pedantic -g -fsanitize=address -fno-omit-frame-pointer"
 
+# MSVC compatibility: verify phc output compiles with strict C11 (no POSIX)
+test-msvc-compat: $(BUILDDIR)/phc
+	@echo "=== MSVC Compatibility Test ==="
+	@$(TESTDIR)/integration/msvc_compat_test.sh $(BUILDDIR)/phc
+
 clean:
 	rm -rf $(BUILDDIR)
