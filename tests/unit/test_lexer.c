@@ -337,6 +337,38 @@ TEST(lex_descr_after_passthrough_returns_to_passthrough) {
     ASSERT_EQ(tok.type, TOK_OTHER);
 }
 
+/* === Preprocessor line marker formats === */
+
+TEST(lex_gcc_line_marker) {
+    /* GCC/Clang format: # N "file" [flags]
+     * After consuming "# 42 ..." + "\n" + "int x;\n", orig_line
+     * advances past the content line, so it ends at 43. */
+    Lexer lex;
+    lexer_init(&lex, "# 42 \"foo.c\"\nint x;\n");
+    Token tok = lexer_next(&lex);
+    ASSERT_EQ(tok.type, TOK_OTHER);
+    ASSERT_EQ(lex.marker_seen, 1);
+    /* orig_line = 42 at start of "int x;", 43 after its \n */
+    ASSERT_EQ(lex.orig_line, 43);
+    ASSERT(lex.orig_file != NULL);
+    ASSERT(lex.orig_file_len == 5);
+    ASSERT(memcmp(lex.orig_file, "foo.c", 5) == 0);
+}
+
+TEST(lex_msvc_line_marker) {
+    /* MSVC format: #line N "file" */
+    Lexer lex;
+    lexer_init(&lex, "#line 99 \"bar.h\"\nint y;\n");
+    Token tok = lexer_next(&lex);
+    ASSERT_EQ(tok.type, TOK_OTHER);
+    ASSERT_EQ(lex.marker_seen, 1);
+    /* Same as GCC: orig_line 99 at content, 100 after \n */
+    ASSERT_EQ(lex.orig_line, 100);
+    ASSERT(lex.orig_file != NULL);
+    ASSERT(lex.orig_file_len == 5);
+    ASSERT(memcmp(lex.orig_file, "bar.h", 5) == 0);
+}
+
 TEST_MAIN(
     /* Keyword recognition */
     RUN_TEST(lex_descr_keyword);
@@ -361,6 +393,9 @@ TEST_MAIN(
     RUN_TEST(lex_passthrough_between_constructs);
     /* Line tracking */
     RUN_TEST(lex_tracks_line_numbers);
+    /* Preprocessor line markers */
+    RUN_TEST(lex_gcc_line_marker);
+    RUN_TEST(lex_msvc_line_marker);
     /* Keyword isolation */
     RUN_TEST(lex_descr_in_string_literal);
     RUN_TEST(lex_descr_in_char_literal);

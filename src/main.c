@@ -1,3 +1,4 @@
+#include "compat.h"
 #include "parser.h"
 #include "semantic.h"
 #include "codegen.h"

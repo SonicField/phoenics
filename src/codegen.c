@@ -1,3 +1,4 @@
+#include "compat.h"
 #include "codegen.h"
 #include "buffer.h"
 #include <string.h>

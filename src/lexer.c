@@ -136,10 +136,21 @@ static Token lexer_next_scan(Lexer *lex) {
     while (lex->pos < lex->len) {
         char c = peek(lex);
 
-        /* Preprocessor line marker: # <number> "file" at start of line */
+        /* Preprocessor line marker:
+         *   GCC/Clang: # <number> "file" [flags]
+         *   MSVC:      #line <number> "file"
+         */
         if (c == '#' && lex->col == 1) {
             size_t p = lex->pos + 1;
             while (p < lex->len && lex->src[p] == ' ') p++;
+            /* MSVC format: skip 'line' keyword if present */
+            if (p + 4 <= lex->len &&
+                lex->src[p] == 'l' && lex->src[p+1] == 'i' &&
+                lex->src[p+2] == 'n' && lex->src[p+3] == 'e' &&
+                (p + 4 >= lex->len || lex->src[p+4] == ' ' || lex->src[p+4] == '\t')) {
+                p += 4;
+                while (p < lex->len && lex->src[p] == ' ') p++;
+            }
             if (p < lex->len && isdigit((unsigned char)lex->src[p])) {
                 int line_num = 0;
                 while (p < lex->len && isdigit((unsigned char)lex->src[p])) {

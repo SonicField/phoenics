@@ -1,3 +1,4 @@
+#include "compat.h"
 #include "semantic.h"
 #include <stdlib.h>
 #include <string.h>
