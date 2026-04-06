@@ -6,4 +6,5 @@ int main(void) {
     *p = 42;
     printf("value: %d\n", *p);
     {  free(p); return 0; }
+ free(p);
 }

@@ -2,6 +2,7 @@
 
 int test(void) {
     {  printf("cleanup\n"); return sizeof(struct { int x; int y; }); }
+ printf("cleanup\n");
 }
 
 int main(void) {

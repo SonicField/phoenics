@@ -1,0 +1,5 @@
+error path
+defer fired
+r1=null
+success path
+r2=hello

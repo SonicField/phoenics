@@ -1,0 +1,28 @@
+#include <stdio.h>
+
+phc_descr Dummy { X {} };
+
+int first(void) {
+    phc_defer { printf("first cleanup\n"); }
+    printf("first body\n");
+    return 1;
+}
+
+int second(void) {
+    /* NO phc_defer here — return must NOT be rewritten with cleanup */
+    printf("second body\n");
+    return 2;
+}
+
+int third(void) {
+    phc_defer { printf("third cleanup\n"); }
+    printf("third body\n");
+    return 3;
+}
+
+int main(void) {
+    printf("ret=%d\n", first());
+    printf("ret=%d\n", second());
+    printf("ret=%d\n", third());
+    return 0;
+}

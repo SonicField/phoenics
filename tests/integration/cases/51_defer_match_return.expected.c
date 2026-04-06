@@ -1,4 +1,5 @@
 extern void abort(void);
+#define phc_free(pp) do { free(*(pp)); *(pp) = ((void*)0); } while(0)
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -65,6 +66,7 @@ int process(Result r) {
 }
 #line 24
     {  free(log); printf("log freed\n"); return -99; }
+ free(log); printf("log freed\n");
 }
 
 int main(void) {

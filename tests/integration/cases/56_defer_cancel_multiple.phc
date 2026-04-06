@@ -1,0 +1,32 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+phc_descr Dummy { X {} };
+
+void test_cancel(int do_cancel) {
+    int *a = malloc(sizeof(int));
+    phc_defer { free(a); printf("defer a\n"); }
+
+    int *b = malloc(sizeof(int));
+    phc_defer { free(b); printf("defer b\n"); }
+
+    int *c = malloc(sizeof(int));
+    phc_defer { free(c); printf("defer c\n"); }
+
+    if (do_cancel) {
+        phc_defer_cancel;
+        printf("cancelled all\n");
+        /* Must manually free since defers are cancelled */
+        free(a); free(b); free(c);
+    } else {
+        printf("not cancelled\n");
+    }
+}
+
+int main(void) {
+    printf("--- with cancel ---\n");
+    test_cancel(1);
+    printf("--- without cancel ---\n");
+    test_cancel(0);
+    return 0;
+}

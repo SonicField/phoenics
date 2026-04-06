@@ -621,6 +621,28 @@ ParseResult parse(const char *source) {
                 p.lex.defer_active = 1;
                 p.passthrough_start = p.cur.pos;
             }
+        } else if (p.cur.type == TOK_PHC_DEFER_CANCEL) {
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            /* Skip past 'phc_defer_cancel' and the following ';' */
+            size_t after_kw = p.cur.pos + p.cur.length;
+            while (after_kw < p.source_len && p.source[after_kw] != ';') after_kw++;
+            if (after_kw < p.source_len) after_kw++; /* skip ; */
+
+            Chunk c;
+            memset(&c, 0, sizeof(c));
+            c.type = CHUNK_DEFER_CANCEL;
+            DA_PUSH(p.chunks, p.chunk_count, p.chunk_cap, c);
+
+            /* Advance lexer past ; */
+            while (p.lex.pos < after_kw && p.lex.pos < p.lex.len) {
+                if (p.lex.src[p.lex.pos] == '\n') {
+                    p.lex.line++; p.lex.col = 1;
+                    if (p.lex.marker_seen) p.lex.orig_line++;
+                } else { p.lex.col++; }
+                p.lex.pos++;
+            }
+            p.passthrough_start = p.lex.pos;
+            p.cur = lexer_next(&p.lex);
         } else if (p.cur.type == TOK_RETURN) {
             /* return <expr>; with active defer — rewrite to goto */
             add_passthrough(&p, p.passthrough_start, p.cur.pos);

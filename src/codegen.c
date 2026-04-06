@@ -381,6 +381,16 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
             free(all_bodies);
             break;
         }
+        case CHUNK_DEFER_CANCEL:
+            /* Set enclosing defer guards to 0 */
+            for (int d = 0; d < defer_body_count; d++)
+                buf_printf(buf, "_phc_dg_%d = 0; ", d + 1);
+            for (int j = i - 1; j >= 0; j--) {
+                if (chunks[j].type == CHUNK_DEFER)
+                    buf_printf(buf, "_phc_dg_%d = 0; ", chunks[j].defer.defer_index + 1);
+            }
+            buf_append(buf, "\n");
+            break;
         case CHUNK_FUNC_END:
             /* Not expected in case bodies */
             break;
@@ -403,6 +413,7 @@ char *codegen(const Program *prog,
     for (int i = 0; i < prog->descr_count; i++) {
         if (prog->descrs[i].variant_count >= 0) {
             buf_append(&buf, "extern void abort(void);\n");
+            buf_append(&buf, "#define phc_free(pp) do { free(*(pp)); *(pp) = ((void*)0); } while(0)\n");
             break;
         }
     }
@@ -434,6 +445,7 @@ char *codegen(const Program *prog,
             const char **dbodies = NULL;
             int dbody_count = 0;
             for (int j = i - 1; j >= 0; j--) {
+                if (prog->chunks[j].type == CHUNK_FUNC_END) break;
                 if (prog->chunks[j].type == CHUNK_DEFER) {
                     active_defers++;
                     dbody_count++;
@@ -443,6 +455,7 @@ char *codegen(const Program *prog,
                 dbodies = calloc((size_t)dbody_count, sizeof(const char *));
                 int f = 0;
                 for (int j = i - 1; j >= 0 && f < dbody_count; j--) {
+                    if (prog->chunks[j].type == CHUNK_FUNC_END) break;
                     if (prog->chunks[j].type == CHUNK_DEFER)
                         dbodies[f++] = prog->chunks[j].defer.body_text;
                 }
@@ -457,23 +470,59 @@ char *codegen(const Program *prog,
                 buf_printf(&buf, "\n#line %d", c->match.end_line);
             break;
         }
-        case CHUNK_DEFER:
-            /* Defer body is emitted at CHUNK_RETURN and CHUNK_FUNC_END */
+        case CHUNK_DEFER: {
+            /* Emit guard variable if any defer_cancel exists in this function */
+            int has_cancel = 0;
+            for (int j = i + 1; j < prog->chunk_count; j++) {
+                if (prog->chunks[j].type == CHUNK_DEFER_CANCEL) { has_cancel = 1; break; }
+                if (prog->chunks[j].type == CHUNK_FUNC_END) break;
+            }
+            if (has_cancel) {
+                buf_printf(&buf, "int _phc_dg_%d = 1;\n", c->defer.defer_index + 1);
+            }
             break;
+        }
+        case CHUNK_DEFER_CANCEL: {
+            /* Set all active defer guards to 0 */
+            for (int j = i - 1; j >= 0; j--) {
+                if (prog->chunks[j].type == CHUNK_FUNC_END) break;
+                if (prog->chunks[j].type == CHUNK_DEFER)
+                    buf_printf(&buf, "_phc_dg_%d = 0; ", prog->chunks[j].defer.defer_index + 1);
+                if (prog->chunks[j].type == CHUNK_FUNC_END) break;
+            }
+            buf_append(&buf, "\n");
+            break;
+        }
         case CHUNK_RETURN: {
             /* Emit defer cleanup inline (reverse order), then actual return */
             int n = c->ret.defer_count;
-            const char **bodies = calloc((size_t)n, sizeof(const char *));
+            const char **bodies = calloc((size_t)(n > 0 ? n : 1), sizeof(const char *));
+            int *indices = calloc((size_t)(n > 0 ? n : 1), sizeof(int));
             int found = 0;
+            int has_cancel = 0;
             for (int j = i - 1; j >= 0 && found < n; j--) {
-                if (prog->chunks[j].type == CHUNK_DEFER)
-                    bodies[found++] = prog->chunks[j].defer.body_text;
+                if (prog->chunks[j].type == CHUNK_FUNC_END) break;
+                if (prog->chunks[j].type == CHUNK_DEFER) {
+                    bodies[found] = prog->chunks[j].defer.body_text;
+                    indices[found] = prog->chunks[j].defer.defer_index + 1;
+                    found++;
+                }
+                if (prog->chunks[j].type == CHUNK_DEFER_CANCEL) has_cancel = 1;
+            }
+            /* Check if cancel exists ahead too */
+            for (int j = i + 1; j < prog->chunk_count && !has_cancel; j++) {
+                if (prog->chunks[j].type == CHUNK_DEFER_CANCEL) has_cancel = 1;
+                if (prog->chunks[j].type == CHUNK_FUNC_END) break;
             }
             buf_append(&buf, "{ ");
             for (int d = 0; d < found; d++) {
                 if (bodies[d]) {
-                    buf_append(&buf, bodies[d]);
-                    buf_append(&buf, " ");
+                    if (has_cancel)
+                        buf_printf(&buf, "if (_phc_dg_%d) { %s } ", indices[d], bodies[d]);
+                    else {
+                        buf_append(&buf, bodies[d]);
+                        buf_append(&buf, " ");
+                    }
                 }
             }
             if (c->ret.expr)
@@ -481,23 +530,36 @@ char *codegen(const Program *prog,
             else
                 buf_append(&buf, "return; }");
             free(bodies);
+            free(indices);
             break;
         }
         case CHUNK_FUNC_END: {
             int n = c->func_end.defer_count;
-            const char **bodies = calloc((size_t)n, sizeof(const char *));
+            const char **bodies = calloc((size_t)(n > 0 ? n : 1), sizeof(const char *));
+            int *indices = calloc((size_t)(n > 0 ? n : 1), sizeof(int));
             int found = 0;
+            int has_cancel = 0;
             for (int j = i - 1; j >= 0 && found < n; j--) {
-                if (prog->chunks[j].type == CHUNK_DEFER)
-                    bodies[found++] = prog->chunks[j].defer.body_text;
+                if (prog->chunks[j].type == CHUNK_FUNC_END) break;
+                if (prog->chunks[j].type == CHUNK_DEFER) {
+                    bodies[found] = prog->chunks[j].defer.body_text;
+                    indices[found] = prog->chunks[j].defer.defer_index + 1;
+                    found++;
+                }
+                if (prog->chunks[j].type == CHUNK_DEFER_CANCEL) has_cancel = 1;
             }
             for (int d = 0; d < found; d++) {
                 if (bodies[d]) {
-                    buf_append(&buf, bodies[d]);
-                    buf_append(&buf, "\n");
+                    if (has_cancel)
+                        buf_printf(&buf, "if (_phc_dg_%d) { %s }\n", indices[d], bodies[d]);
+                    else {
+                        buf_append(&buf, bodies[d]);
+                        buf_append(&buf, "\n");
+                    }
                 }
             }
             free(bodies);
+            free(indices);
             break;
         }
         }

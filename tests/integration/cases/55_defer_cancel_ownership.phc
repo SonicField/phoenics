@@ -1,0 +1,33 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+phc_descr Dummy { X {} };
+
+char *make_string(int fail) {
+    char *result = malloc(64);
+    strcpy(result, "hello");
+    phc_defer { free(result); printf("defer fired\n"); }
+
+    if (fail) {
+        printf("error path\n");
+        return NULL;  /* defer fires: free(result) */
+    }
+
+    phc_defer_cancel;
+    printf("success path\n");
+    return result;  /* defer does NOT fire: ownership transferred */
+}
+
+int main(void) {
+    /* Error path — defer fires */
+    char *r1 = make_string(1);
+    printf("r1=%s\n", r1 ? r1 : "null");
+
+    /* Success path — defer cancelled, ownership transferred */
+    char *r2 = make_string(0);
+    printf("r2=%s\n", r2);
+    free(r2);
+
+    return 0;
+}

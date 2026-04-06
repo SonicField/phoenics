@@ -61,6 +61,7 @@ typedef enum {
     CHUNK_DESCR,
     CHUNK_MATCH_DESCR,
     CHUNK_DEFER,
+    CHUNK_DEFER_CANCEL,
     CHUNK_RETURN,
     CHUNK_FUNC_END      /* function closing brace with pending defers */
 } ChunkType;

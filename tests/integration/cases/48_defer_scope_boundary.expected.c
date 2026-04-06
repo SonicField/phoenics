@@ -15,6 +15,7 @@ int check(int x) {
 
     printf("normal path\n");
     {  printf("cleanup\n"); return x; }
+ printf("cleanup\n");
 }
 
 int main(void) {

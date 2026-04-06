@@ -10,6 +10,7 @@ int process(int fail) {
 
     printf("normal path\n");
     {  free(buf); printf("freed\n"); return 0; }
+ free(buf); printf("freed\n");
 }
 
 int main(void) {

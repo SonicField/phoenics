@@ -5,4 +5,5 @@ int main(void) {
     printf("return 0;\n");
     printf("fake return\n");
     {  printf("cleanup\n"); return 0; }
+ printf("cleanup\n");
 }

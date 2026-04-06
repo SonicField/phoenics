@@ -1,0 +1,7 @@
+--- with cancel ---
+cancelled all
+--- without cancel ---
+not cancelled
+defer c
+defer b
+defer a

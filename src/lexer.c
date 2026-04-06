@@ -189,7 +189,8 @@ static Token lexer_next_scan(Lexer *lex) {
             /* Check for Phoenics keywords (phc_ prefixed — no collision risk) */
             if (check_keyword(lex, id_start, id_len, "phc_descr", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_match", 9) ||
-                check_keyword(lex, id_start, id_len, "phc_defer", 9)) {
+                check_keyword(lex, id_start, id_len, "phc_defer", 9) ||
+                check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16)) {
                 /* Keyword found! Emit TOK_OTHER for text before it, if any */
                 if (id_start > start) {
                     return make_token(TOK_OTHER, lex->src + start,
@@ -205,7 +206,12 @@ static Token lexer_next_scan(Lexer *lex) {
                 lex->brace_depth = 0;
                 lex->depth_zero_seen = 0;
 
-                if (id_len == 9 && lex->src[id_start + 4] == 'd' &&
+                if (id_len == 16 && check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16)) {
+                    /* phc_defer_cancel — not a struct-mode keyword */
+                    lex->mode = LEXER_SCAN;
+                    return make_token(TOK_PHC_DEFER_CANCEL, lex->src + id_start,
+                                      id_len, id_start, kline, kcol, korig);
+                } else if (id_len == 9 && lex->src[id_start + 4] == 'd' &&
                     lex->src[id_start + 6] == 'f') {
                     /* phc_defer */
                     return make_token(TOK_PHC_DEFER, lex->src + id_start,
@@ -245,12 +251,13 @@ static Token lexer_next_scan(Lexer *lex) {
             lex->scan_brace_depth--;
             if (lex->scan_brace_depth <= 0 && lex->defer_active) {
                 /* Function closing brace — emit text before it, then the brace */
-                lex->defer_active = 0;
                 if (lex->pos > start) {
+                    /* Return accumulated text first; } will be emitted next call */
                     return make_token(TOK_OTHER, lex->src + start,
                                       lex->pos - start, start, sline, scol, sorig);
                 }
-                /* Return the closing brace as TOK_RBRACE so parser can emit cleanup */
+                /* Return the closing brace as TOK_RBRACE */
+                lex->defer_active = 0;
                 int kline = lex->line;
                 int kcol = lex->col;
                 int korig = lex->orig_line;

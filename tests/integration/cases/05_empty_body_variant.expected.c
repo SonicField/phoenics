@@ -1,4 +1,5 @@
 extern void abort(void);
+#define phc_free(pp) do { free(*(pp)); *(pp) = ((void*)0); } while(0)
 typedef enum {
     Maybe_int_Just,
     Maybe_int_Nothing,

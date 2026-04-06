@@ -19,6 +19,7 @@ typedef enum {
     TOK_CASE,         /* 'case' keyword */
     TOK_BREAK,        /* 'break' keyword */
     TOK_PHC_DEFER,    /* 'phc_defer' keyword */
+    TOK_PHC_DEFER_CANCEL, /* 'phc_defer_cancel' keyword */
     TOK_RETURN,       /* 'return' keyword (scan mode, only when defer active) */
     TOK_OTHER         /* anything that isn't part of descr/match_descr syntax */
 } TokenType;
