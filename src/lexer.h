@@ -7,6 +7,7 @@ typedef enum {
     TOK_EOF = 0,
     TOK_DESCR,        /* 'descr' keyword */
     TOK_ENUM,         /* 'enum' keyword (phc_enum) */
+    TOK_FLAGS,        /* 'flags' keyword (phc_flags) */
     TOK_MATCH_DESCR,  /* 'match_descr' keyword */
     TOK_IDENT,        /* identifier */
     TOK_LBRACE,       /* { */

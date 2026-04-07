@@ -1,0 +1,5 @@
+/* Zero value is meaningless for a flag — phc must reject */
+phc_flags BadFlags {
+    Nothing = 0,
+    Something = 1
+};

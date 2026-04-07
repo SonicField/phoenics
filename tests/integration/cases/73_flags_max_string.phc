@@ -1,0 +1,15 @@
+#include <stdio.h>
+
+phc_flags Opts {
+    Alpha,
+    Beta,
+    Gamma
+};
+
+int main(void) {
+    /* __MAX_STRING is large enough for all flag names joined by '|' */
+    char buf[Opts__MAX_STRING];
+    Opts all = Opts__ALL;
+    printf("%s\n", Opts_to_string(all, buf, sizeof(buf)));
+    return 0;
+}

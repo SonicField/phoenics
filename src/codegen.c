@@ -133,6 +133,74 @@ static void emit_enum(Buffer *buf, const EnumDecl *e) {
     buf_append(buf, "}");
 }
 
+/* --- flags codegen --- */
+
+static void emit_flags(Buffer *buf, const EnumDecl *f) {
+    /* typedef unsigned int */
+    buf_printf(buf, "typedef unsigned int %s;\n", f->name);
+
+    /* #define constants — all-auto (power-of-2) or all-explicit.
+     * Mixing is rejected by the parser. */
+    for (int i = 0; i < f->value_count; i++) {
+        if (f->values[i].has_value) {
+            buf_printf(buf, "#define %s_%s (0x%02xu)\n",
+                       f->name, f->values[i].name, (unsigned)f->values[i].value);
+        } else {
+            buf_printf(buf, "#define %s_%s (1u << %d)\n",
+                       f->name, f->values[i].name, i);
+        }
+    }
+
+    /* __ALL = OR of all flags */
+    buf_printf(buf, "#define %s__ALL (", f->name);
+    for (int i = 0; i < f->value_count; i++) {
+        if (i > 0) buf_append(buf, " | ");
+        buf_printf(buf, "%s_%s", f->name, f->values[i].name);
+    }
+    buf_append(buf, ")\n");
+
+    /* __COUNT */
+    buf_printf(buf, "#define %s__COUNT %d\n", f->name, f->value_count);
+
+    /* __MAX_STRING = sum of name lengths + separators + null */
+    int max_str = 1; /* null terminator */
+    for (int i = 0; i < f->value_count; i++) {
+        max_str += (int)strlen(f->values[i].name);
+        if (i > 0) max_str += 1; /* '|' separator */
+    }
+    if (f->value_count == 0) max_str = 7; /* "(none)" + null */
+    buf_printf(buf, "#define %s__MAX_STRING %d\n", f->name, max_str);
+
+    /* has/set/clear helpers */
+    buf_printf(buf, "\nstatic inline int %s_has(%s flags, %s flag) {\n",
+               f->name, f->name, f->name);
+    buf_append(buf, "    return (flags & flag) == flag;\n");
+    buf_append(buf, "}\n");
+
+    buf_printf(buf, "\nstatic inline %s %s_set(%s flags, %s flag) {\n",
+               f->name, f->name, f->name, f->name);
+    buf_append(buf, "    return flags | flag;\n");
+    buf_append(buf, "}\n");
+
+    buf_printf(buf, "\nstatic inline %s %s_clear(%s flags, %s flag) {\n",
+               f->name, f->name, f->name, f->name);
+    buf_append(buf, "    return flags & ~flag;\n");
+    buf_append(buf, "}\n");
+
+    /* to_string — caller-provided buffer, snprintf */
+    buf_printf(buf, "\nstatic inline const char *%s_to_string(%s p, char *buf, unsigned long len) {\n",
+               f->name, f->name);
+    buf_append(buf, "    buf[0] = '\\0';\n");
+    buf_append(buf, "    unsigned long pos = 0;\n");
+    for (int i = 0; i < f->value_count; i++) {
+        buf_printf(buf, "    if (p & %s_%s) { pos += snprintf(buf + pos, len - pos, \"%%s%s\", pos ? \"|\" : \"\"); }\n",
+                   f->name, f->values[i].name, f->values[i].name);
+    }
+    buf_append(buf, "    if (pos == 0) { snprintf(buf, len, \"(none)\"); }\n");
+    buf_append(buf, "    return buf;\n");
+    buf_append(buf, "}");
+}
+
 /* Check if a type name is a phc_enum */
 static int is_enum_type(const char *type_name,
                         const EnumDecl *enums, int enum_count) {
@@ -403,6 +471,7 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
                             active_defer_count, defer_bodies, defer_body_count);
             break;
         case CHUNK_ENUM:
+        case CHUNK_FLAGS:
             /* Not expected in case bodies, but handle gracefully */
             break;
         case CHUNK_DEFER:
@@ -478,6 +547,10 @@ char *codegen(const Program *prog,
     if (prog->enum_count > 0) {
         buf_append(&buf, "extern int strcmp(const char *, const char *);\n");
     }
+    /* Declare snprintf() for flags to_string functions */
+    if (prog->flags_count > 0) {
+        buf_append(&buf, "extern int snprintf(char *, unsigned long, const char *, ...);\n");
+    }
 
     for (int i = 0; i < prog->chunk_count; i++) {
         const Chunk *c = &prog->chunks[i];
@@ -507,6 +580,15 @@ char *codegen(const Program *prog,
                 buf_printf(&buf, "\n#line %d \"%s\"", e->end_line, e->end_file);
             else
                 buf_printf(&buf, "\n#line %d", e->end_line);
+            break;
+        }
+        case CHUNK_FLAGS: {
+            const EnumDecl *f = &prog->flags[c->flags_index];
+            emit_flags(&buf, f);
+            if (f->end_file)
+                buf_printf(&buf, "\n#line %d \"%s\"", f->end_line, f->end_file);
+            else
+                buf_printf(&buf, "\n#line %d", f->end_line);
             break;
         }
         case CHUNK_MATCH_DESCR: {

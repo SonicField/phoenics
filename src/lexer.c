@@ -200,6 +200,7 @@ static Token lexer_next_scan(Lexer *lex) {
             /* Check for Phoenics keywords (phc_ prefixed — no collision risk) */
             if (check_keyword(lex, id_start, id_len, "phc_descr", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_enum", 8) ||
+                check_keyword(lex, id_start, id_len, "phc_flags", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_match", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_defer", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16)) {
@@ -231,6 +232,10 @@ static Token lexer_next_scan(Lexer *lex) {
                 } else if (id_len == 8 && check_keyword(lex, id_start, id_len, "phc_enum", 8)) {
                     /* phc_enum */
                     return make_token(TOK_ENUM, lex->src + id_start,
+                                      id_len, id_start, kline, kcol, korig);
+                } else if (id_len == 9 && check_keyword(lex, id_start, id_len, "phc_flags", 9)) {
+                    /* phc_flags */
+                    return make_token(TOK_FLAGS, lex->src + id_start,
                                       id_len, id_start, kline, kcol, korig);
                 } else if (id_len == 9 && lex->src[id_start + 4] == 'd') {
                     return make_token(TOK_DESCR, lex->src + id_start,

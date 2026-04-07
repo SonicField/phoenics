@@ -1,0 +1,16 @@
+#include <stdio.h>
+
+phc_flags Permissions {
+    Read,
+    Write,
+    Execute
+};
+
+int main(void) {
+    Permissions p = Permissions_Read | Permissions_Write;
+    char buf[64];
+    printf("%s\n", Permissions_to_string(p, buf, sizeof(buf)));
+    printf("has read: %d\n", Permissions_has(p, Permissions_Read));
+    printf("has exec: %d\n", Permissions_has(p, Permissions_Execute));
+    return 0;
+}

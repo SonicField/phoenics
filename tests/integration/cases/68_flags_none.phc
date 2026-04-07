@@ -1,0 +1,14 @@
+#include <stdio.h>
+
+phc_flags Status {
+    Active,
+    Pending,
+    Closed
+};
+
+int main(void) {
+    Status s = 0;
+    char buf[64];
+    printf("%s\n", Status_to_string(s, buf, sizeof(buf)));
+    return 0;
+}

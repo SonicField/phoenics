@@ -1,0 +1,6 @@
+/* Non-power-of-2 mask — phc must reject this */
+phc_flags BadFlags {
+    Read = 0x01,
+    Write = 0x02,
+    ReadWrite = 0x03
+};

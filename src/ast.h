@@ -74,6 +74,7 @@ typedef enum {
     CHUNK_PASSTHROUGH,
     CHUNK_DESCR,
     CHUNK_ENUM,
+    CHUNK_FLAGS,
     CHUNK_MATCH_DESCR,
     CHUNK_DEFER,
     CHUNK_DEFER_CANCEL,
@@ -87,6 +88,7 @@ struct Chunk {
         struct { size_t start; size_t end; } passthrough;
         int descr_index;
         int enum_index;
+        int flags_index;
         MatchDescr match;
         DeferBlock defer;
         ReturnStmt ret;
@@ -101,6 +103,8 @@ typedef struct {
     int descr_count;
     EnumDecl *enums;
     int enum_count;
+    EnumDecl *flags;
+    int flags_count;
     Chunk *chunks;
     int chunk_count;
     DeferBlock *defers;     /* all defer blocks (referenced by chunks) */

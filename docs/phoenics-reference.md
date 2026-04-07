@@ -258,6 +258,125 @@ phc_enum types appear in type manifests (`--emit-types`). Cross-file exhaustiven
 
 ---
 
+## `phc_flags` — Type-Safe Bitflags
+
+C flag enums use manual power-of-2 constants. Programmers miscalculate, duplicate values, and debug-printing flags is always manual. phc_flags generates the constants and the helpers.
+
+### Syntax
+
+```
+phc_flags <TypeName> {
+    <Name>,
+    <Name>,
+    ...
+};
+```
+
+At least one flag. Flags separated by commas. Two modes, not mixed:
+
+- **Auto-assigned:** omit values. The first flag is `(1u << 0)`, the second `(1u << 1)`, and so on.
+- **Explicit masks:** assign every flag. For hardware registers and protocol definitions where bit positions are externally specified.
+
+If some flags have explicit values and others do not, phc rejects the declaration. All-auto or all-explicit — no mixing.
+
+### Example
+
+```c
+phc_flags Permissions {
+    Read,
+    Write,
+    Execute
+};
+```
+
+With explicit masks (hardware registers):
+
+```c
+phc_flags GpioPin {
+    Input  = 0x01,
+    Output = 0x02,
+    PullUp = 0x10,
+    PullDown = 0x20
+};
+```
+
+### What phc generates
+
+Four things.
+
+**Type and constants:**
+```c
+typedef unsigned int Permissions;
+#define Permissions_Read    (1u << 0)
+#define Permissions_Write   (1u << 1)
+#define Permissions_Execute (1u << 2)
+#define Permissions__ALL    (Permissions_Read | Permissions_Write | Permissions_Execute)
+#define Permissions__COUNT  3
+#define Permissions__MAX_STRING 21  /* "Read|Write|Execute" + null */
+```
+
+The type is `unsigned int`, not `enum` — bitwise OR of enum values is implementation-defined in some compilers. `__COUNT` is the number of declared flags. `__MAX_STRING` is the buffer size needed for `to_string` with all flags set.
+
+**Helpers:**
+```c
+static inline int Permissions_has(Permissions flags, Permissions flag) {
+    return (flags & flag) == flag;
+}
+static inline Permissions Permissions_set(Permissions flags, Permissions flag) {
+    return flags | flag;
+}
+static inline Permissions Permissions_clear(Permissions flags, Permissions flag) {
+    return flags & ~flag;
+}
+```
+
+**Debug printing (to_string):**
+```c
+static inline const char *Permissions_to_string(Permissions p, char *buf, size_t len) {
+    buf[0] = '\0';
+    if (p & Permissions_Read) snprintf(buf + strlen(buf), len - strlen(buf), "%sRead", buf[0] ? "|" : "");
+    if (p & Permissions_Write) snprintf(buf + strlen(buf), len - strlen(buf), "%sWrite", buf[0] ? "|" : "");
+    if (p & Permissions_Execute) snprintf(buf + strlen(buf), len - strlen(buf), "%sExecute", buf[0] ? "|" : "");
+    if (buf[0] == '\0') snprintf(buf, len, "(none)");
+    return buf;
+}
+```
+
+Caller provides the buffer. Use `__MAX_STRING` for sizing:
+
+```c
+char buf[Permissions__MAX_STRING];
+printf("%s\n", Permissions_to_string(perms, buf, sizeof(buf)));
+```
+
+No allocation. Thread-safe. The caller owns the buffer.
+
+### Naming
+
+| What | Pattern | Example |
+|------|---------|---------|
+| Type | `<Type>` | `Permissions` |
+| Flag constant | `<Type>_<Name>` | `Permissions_Read` |
+| All flags | `<Type>__ALL` | `Permissions__ALL` |
+| Flag count | `<Type>__COUNT` | `Permissions__COUNT` |
+| Max string size | `<Type>__MAX_STRING` | `Permissions__MAX_STRING` |
+| Has flag | `<Type>_has` | `Permissions_has` |
+| Set flag | `<Type>_set` | `Permissions_set` |
+| Clear flag | `<Type>_clear` | `Permissions_clear` |
+| To string | `<Type>_to_string` | `Permissions_to_string` |
+
+### Constraints
+
+- Maximum 32 flags per type (fits `unsigned int`). More than 32 is a phc error.
+- Explicit mask values must be powers of 2. Non-power-of-2 masks are a phc error.
+- phc_flags types do NOT work with `phc_match` — flags are combinable, not exclusive. Use bitwise tests instead.
+
+### Manifest support
+
+phc_flags types appear in type manifests (`--emit-types`).
+
+---
+
 ## `phc_match` — Exhaustive Match
 
 ### Syntax

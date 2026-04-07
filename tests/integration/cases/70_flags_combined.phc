@@ -1,0 +1,18 @@
+#include <stdio.h>
+
+phc_flags Color {
+    Red,
+    Green,
+    Blue
+};
+
+int main(void) {
+    Color white = Color__ALL;
+    Color magenta = Color_Red | Color_Blue;
+    char buf[64];
+
+    printf("white: %s\n", Color_to_string(white, buf, sizeof(buf)));
+    printf("magenta: %s\n", Color_to_string(magenta, buf, sizeof(buf)));
+    printf("count: %d\n", Color__COUNT);
+    return 0;
+}

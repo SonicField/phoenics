@@ -1,0 +1,25 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+phc_flags Options {
+    Fast,
+    Safe,
+    Quiet
+};
+
+const char *describe(Options opts) {
+    char *buf = malloc(128);
+    phc_defer { free(buf); }
+
+    Options_to_string(opts, buf, 128);
+    if (Options_has(opts, Options_Fast)) {
+        return "fast mode";
+    }
+    return "normal mode";
+}
+
+int main(void) {
+    Options o = Options_Fast | Options_Safe;
+    printf("%s\n", describe(o));
+    return 0;
+}

@@ -1,0 +1,21 @@
+#include <stdio.h>
+
+phc_flags Mode {
+    Verbose,
+    Debug,
+    Strict
+};
+
+int main(void) {
+    Mode m = 0;
+    m = Mode_set(m, Mode_Verbose);
+    m = Mode_set(m, Mode_Debug);
+    char buf[64];
+    printf("%s\n", Mode_to_string(m, buf, sizeof(buf)));
+
+    m = Mode_clear(m, Mode_Verbose);
+    printf("%s\n", Mode_to_string(m, buf, sizeof(buf)));
+
+    printf("all: 0x%x\n", Mode__ALL);
+    return 0;
+}

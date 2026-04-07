@@ -37,6 +37,10 @@ typedef struct {
     int enum_count;
     int enum_cap;
 
+    EnumDecl *flags;
+    int flags_count;
+    int flags_cap;
+
     Chunk *chunks;
     int chunk_count;
     int chunk_cap;
@@ -477,6 +481,161 @@ static int parse_enum(Parser *p) {
     return 1;
 }
 
+/* --- flags parsing (reuses EnumDecl structure) --- */
+
+static int parse_flags(Parser *p) {
+    if (p->cur.type != TOK_IDENT) {
+        parser_error(p, "expected type name after 'phc_flags'");
+        return 0;
+    }
+
+    EnumDecl e;
+    memset(&e, 0, sizeof(e));
+    e.name = strndup(p->cur.value, p->cur.length);
+    next_token(p);
+
+    if (p->cur.type != TOK_LBRACE) {
+        parser_error(p, "expected '{' after flags type name");
+        free(e.name);
+        return 0;
+    }
+    next_token(p);
+
+    int value_cap = 0;
+    int first = 1;
+    while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
+        if (!first) {
+            if (p->cur.type == TOK_COMMA) {
+                next_token(p);
+                if (p->cur.type == TOK_RBRACE) break;
+            }
+        }
+        first = 0;
+
+        if (p->cur.type != TOK_IDENT) {
+            parser_error(p, "expected flag name");
+            free(e.name);
+            for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+            free(e.values);
+            return 0;
+        }
+
+        EnumValue ev;
+        memset(&ev, 0, sizeof(ev));
+        ev.name = strndup(p->cur.value, p->cur.length);
+        next_token(p);
+
+        if (p->cur.type == TOK_EQUALS) {
+            next_token(p);
+            if (p->cur.type != TOK_NUMBER) {
+                parser_error(p, "expected integer after '=' in flag value");
+                free(ev.name);
+                free(e.name);
+                for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+                free(e.values);
+                return 0;
+            }
+            ev.has_value = 1;
+            if (p->cur.length > 2 && p->cur.value[0] == '0' &&
+                (p->cur.value[1] == 'x' || p->cur.value[1] == 'X')) {
+                ev.value = (int)strtol(p->cur.value, NULL, 16);
+            } else {
+                ev.value = (int)strtol(p->cur.value, NULL, 10);
+            }
+            next_token(p);
+        }
+
+        DA_PUSH(e.values, e.value_count, value_cap, ev);
+    }
+
+    if (e.value_count == 0) {
+        parser_error(p, "phc_flags '%s' must have at least one flag", e.name);
+        free(e.name);
+        free(e.values);
+        return 0;
+    }
+
+    if (e.value_count > 32) {
+        parser_error(p, "phc_flags '%s' has %d flags (max 32)", e.name, e.value_count);
+        free(e.name);
+        for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+        free(e.values);
+        return 0;
+    }
+
+    /* Validate explicit values: must be non-zero powers of 2 */
+    for (int i = 0; i < e.value_count; i++) {
+        if (e.values[i].has_value) {
+            int v = e.values[i].value;
+            if (v == 0) {
+                parser_error(p, "explicit value must not be zero in phc_flags '%s'", e.name);
+                free(e.name);
+                for (int j = 0; j < e.value_count; j++) free(e.values[j].name);
+                free(e.values);
+                return 0;
+            }
+            if ((v & (v - 1)) != 0) {
+                parser_error(p, "explicit value must be a power of 2 in phc_flags '%s'", e.name);
+                free(e.name);
+                for (int j = 0; j < e.value_count; j++) free(e.values[j].name);
+                free(e.values);
+                return 0;
+            }
+        }
+    }
+
+    /* Reject mixing explicit and auto values — all or nothing */
+    {
+        int has_explicit = 0, has_auto = 0;
+        for (int i = 0; i < e.value_count; i++) {
+            if (e.values[i].has_value) has_explicit = 1;
+            else has_auto = 1;
+        }
+        if (has_explicit && has_auto) {
+            parser_error(p, "all values must be explicit or all must be auto-assigned in phc_flags '%s'", e.name);
+            free(e.name);
+            for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+            free(e.values);
+            return 0;
+        }
+    }
+
+    if (!expect(p, TOK_RBRACE)) {
+        free(e.name);
+        for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+        free(e.values);
+        return 0;
+    }
+    if (p->cur.type != TOK_SEMICOLON) {
+        parser_error(p, "expected ';' after phc_flags declaration");
+        free(e.name);
+        for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+        free(e.values);
+        return 0;
+    }
+    size_t end_pos = p->cur.pos + 1;
+    next_token(p);
+    if (p->lex.marker_seen) {
+        e.end_line = p->cur.orig_line + 1;
+        e.end_file = strndup(p->lex.orig_file, p->lex.orig_file_len);
+    } else {
+        e.end_line = p->cur.line + 1;
+        e.end_file = NULL;
+    }
+
+    int idx = p->flags_count;
+    DA_PUSH(p->flags, p->flags_count, p->flags_cap, e);
+
+    Chunk c;
+    memset(&c, 0, sizeof(c));
+    c.type = CHUNK_FLAGS;
+    c.flags_index = idx;
+    DA_PUSH(p->chunks, p->chunk_count, p->chunk_cap, c);
+
+    p->passthrough_start = end_pos;
+    return 1;
+}
+
 /* --- match_descr parsing --- */
 
 static int parse_match_descr(Parser *p, size_t keyword_pos) {
@@ -691,6 +850,10 @@ ParseResult parse(const char *source) {
             add_passthrough(&p, p.passthrough_start, p.cur.pos);
             next_token(&p);
             parse_enum(&p);
+        } else if (p.cur.type == TOK_FLAGS) {
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            next_token(&p);
+            parse_flags(&p);
         } else if (p.cur.type == TOK_MATCH_DESCR) {
             add_passthrough(&p, p.passthrough_start, p.cur.pos);
             size_t kw_pos = p.cur.pos;
@@ -849,6 +1012,8 @@ ParseResult parse(const char *source) {
     result.program.descr_count = p.descr_count;
     result.program.enums = p.enums;
     result.program.enum_count = p.enum_count;
+    result.program.flags = p.flags;
+    result.program.flags_count = p.flags_count;
     result.program.chunks = p.chunks;
     result.program.chunk_count = p.chunk_count;
     result.program.defers = p.defers;
@@ -884,6 +1049,15 @@ void parse_result_free(ParseResult *result) {
         free(e->end_file);
     }
     free(result->program.enums);
+    for (int i = 0; i < result->program.flags_count; i++) {
+        EnumDecl *e = &result->program.flags[i];
+        free(e->name);
+        for (int j = 0; j < e->value_count; j++)
+            free(e->values[j].name);
+        free(e->values);
+        free(e->end_file);
+    }
+    free(result->program.flags);
     for (int i = 0; i < result->program.chunk_count; i++) {
         Chunk *c = &result->program.chunks[i];
         if (c->type == CHUNK_MATCH_DESCR) {

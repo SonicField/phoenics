@@ -1,0 +1,5 @@
+phc_flags HwReg {
+    Enable = 0x01,
+    Ready = 0x02,
+    Error = 0x80
+};

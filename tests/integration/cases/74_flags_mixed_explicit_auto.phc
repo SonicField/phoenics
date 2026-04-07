@@ -1,0 +1,6 @@
+/* Mixing explicit and auto values is rejected — all or nothing */
+phc_flags IoFlags {
+    Readable = 0x04,
+    Writable,
+    Executable
+};
