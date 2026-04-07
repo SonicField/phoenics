@@ -4,8 +4,14 @@ Priority-ordered feature list for phoenics, produced by team brainstorm with
 architectural review (theologian), BS-detection (testkeeper), and practicality
 gating (gatekeeper). Only features that passed all gates are included.
 
-Current state: V9 (fee4b39). Features: phc_descr, phc_match, phc_defer,
-phc_defer_cancel, phc_free. 266 tests, ASan clean. Pushed to SonicField/phoenics.
+Current state: V12 (86f6dec). Features: phc_descr, phc_match, phc_defer,
+phc_defer_cancel, phc_free, phc_enum, phc_flags, --emit-types with .phc.h
+header generation. 255 tests, ASan clean. Pushed to SonicField/phoenics.
+
+**Scope cut (2026-04-07):** alexie approved Tier 1 (#1 phc_enum, #2 phc_flags)
+and Tier 2 #3 (--emit-types). All three shipped as V10-V12. Tier 2 #4
+(phc_generic) killed — "far too type oriented." Tier 3 features (#5-#8)
+killed — "not enough gain." See chat record at .nbs/chat/phc.chat:~L1165.
 
 ---
 
@@ -13,7 +19,7 @@ phc_defer_cancel, phc_free. 266 tests, ASan clean. Pushed to SonicField/phoenics
 
 ### 1. phc_enum — Enhanced Enums
 
-**Status:** Unanimous PASS. Three independent proposals converged on this.
+**Status:** SHIPPED (V10, ebe7dff). Unanimous PASS. Three independent proposals converged on this.
 
 **Problem:** C enums are weak ints. No exhaustive matching, no string conversion,
 no count. Every C project reinvents enum-to-string tables that go stale when
@@ -54,7 +60,7 @@ matching for discriminated unions — extending to plain enums is the natural ne
 
 ### 2. phc_flags — Type-Safe Bitflags
 
-**Status:** PASS. Same convergence signal as phc_enum.
+**Status:** SHIPPED (V11, a2d2dd0). PASS. Same convergence signal as phc_enum.
 
 **Problem:** C flag enums use manual power-of-2 constants. Programmers miscalculate,
 duplicate values, forget to update combination masks. Debug-printing flags is always
@@ -94,9 +100,11 @@ defines vs typedef enum). Bounded.
 
 ## Tier 2 — Build Soon (high value, moderate effort)
 
-### 3. phc_export / phc_import — Auto-Generated Headers
+### 3. --emit-types with .phc.h Header Generation
 
-**Status:** PASS from testkeeper and gatekeeper. Fixes real workflow pain.
+**Status:** SHIPPED (V12, e1d4fd9). PASS from testkeeper and gatekeeper.
+Cross-file enum bug fixed in 86f6dec. Original proposal was phc_export/phc_import
+keywords; shipped as enhanced --emit-types tooling (no new keywords needed).
 
 **Problem:** Cross-file type sharing requires manual .phc-types manifests. Manual
 maintenance is fragile and universally hated.
@@ -135,8 +143,9 @@ A veteran C programmer would say "finally."
 
 ### 4. phc_generic / phc_stamp — Type Stamping
 
-**Status:** PASS (with permanent hard limits). Right concept, real slippery-slope
-risk mitigated by hard limits that ARE the feature.
+**Status:** KILLED. alexie: "far too type oriented — I don't think AIs need this
+and the next generation of AIs definitely will not." (2026-04-07, scope cut)
+Original status was PASS (with permanent hard limits).
 
 **Problem:** Type-safe parameterized containers in C require X-macros or token pasting,
 which produce unreadable preprocessor output and cannot integrate with phc_match
@@ -194,12 +203,11 @@ exhaustiveness. This capability does not exist in C or the preprocessor.
 
 ---
 
-## Tier 3 — Consider Later (value exists but significant effort or unresolved debate)
+## Tier 3 — KILLED (scope cut 2026-04-07: "not enough gain")
 
 ### 5. phc_assert — Multi-Level Assertions
 
-**Status:** PASS (testkeeper proposal, theologian endorsed). Solves the contract
-motivation without requiring function signature parsing.
+**Status:** KILLED. Original: PASS (testkeeper proposal, theologian endorsed).
 
 **Problem:** C's `assert()` is controlled by NDEBUG — all-or-nothing. Contracts
 (preconditions, invariants) are specifications, not debugging aids. You want to keep
@@ -223,8 +231,8 @@ what differentiates this from a macro and justifies phc-level processing.
 
 ### 6. phc_test — Inline Test Blocks
 
-**Status:** PASS from gatekeeper. Testkeeper calls it "mixed" (process problem vs
-language feature). Debatable but real AI-workflow value.
+**Status:** KILLED. Original: PASS from gatekeeper. Testkeeper calls it "mixed"
+(process problem vs language feature).
 
 **Problem:** C has no standard test framework. Every project reinvents test
 infrastructure. AI agents writing test-first need zero-friction test syntax.
@@ -248,8 +256,8 @@ their own main(), or user main() should be guarded with `#ifndef PHC_TEST`.
 
 ### 7. phc_loop / phc_break / phc_continue — Named Loop Control
 
-**Status:** Gatekeeper PASS (practicality). Testkeeper MARGINAL (C has goto).
-Theologian revised to MARGINAL after accepting parser-expansion concern.
+**Status:** KILLED. Original: Gatekeeper PASS (practicality). Testkeeper MARGINAL
+(C has goto). Theologian revised to MARGINAL.
 
 **Problem:** Breaking out of nested loops requires goto with manual labels — error-prone
 (wrong label, stale label after refactoring).
@@ -273,8 +281,8 @@ the value delivered.
 
 ### 8. phc_scope — Block-Scoped Defer
 
-**Status:** CONDITIONAL PASS. Feasible but complex interaction with function-scoped
-defer model.
+**Status:** KILLED. Original: CONDITIONAL PASS. Feasible but complex interaction
+with function-scoped defer model.
 
 **Problem:** phc_defer is function-scoped. Lock/unlock patterns and other block-scoped
 cleanup currently require helper functions.
