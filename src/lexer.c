@@ -199,6 +199,7 @@ static Token lexer_next_scan(Lexer *lex) {
 
             /* Check for Phoenics keywords (phc_ prefixed — no collision risk) */
             if (check_keyword(lex, id_start, id_len, "phc_descr", 9) ||
+                check_keyword(lex, id_start, id_len, "phc_enum", 8) ||
                 check_keyword(lex, id_start, id_len, "phc_match", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_defer", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16)) {
@@ -226,6 +227,10 @@ static Token lexer_next_scan(Lexer *lex) {
                     lex->src[id_start + 6] == 'f') {
                     /* phc_defer */
                     return make_token(TOK_PHC_DEFER, lex->src + id_start,
+                                      id_len, id_start, kline, kcol, korig);
+                } else if (id_len == 8 && check_keyword(lex, id_start, id_len, "phc_enum", 8)) {
+                    /* phc_enum */
+                    return make_token(TOK_ENUM, lex->src + id_start,
                                       id_len, id_start, kline, kcol, korig);
                 } else if (id_len == 9 && lex->src[id_start + 4] == 'd') {
                     return make_token(TOK_DESCR, lex->src + id_start,
@@ -381,6 +386,26 @@ static Token lexer_next_struct(Lexer *lex) {
         return make_token(TOK_COLON, NULL, 1, start, sline, scol, sorig);
     default:
         break;
+    }
+
+    /* Equals sign (for explicit enum values) */
+    if (c == '=') {
+        advance(lex);
+        return make_token(TOK_EQUALS, lex->src + start, 1, start, sline, scol, sorig);
+    }
+
+    /* Number literals */
+    if (isdigit((unsigned char)c) || (c == '-' && isdigit((unsigned char)peek_at(lex, 1)))) {
+        /* Consume optional sign + digits (decimal) or 0x prefix (hex) */
+        if (c == '-') advance(lex);
+        if (peek(lex) == '0' && (peek_at(lex, 1) == 'x' || peek_at(lex, 1) == 'X')) {
+            advance(lex); advance(lex); /* skip 0x */
+            while (lex->pos < lex->len && isxdigit((unsigned char)peek(lex))) advance(lex);
+        } else {
+            while (lex->pos < lex->len && isdigit((unsigned char)peek(lex))) advance(lex);
+        }
+        return make_token(TOK_NUMBER, lex->src + start, lex->pos - start,
+                          start, sline, scol, sorig);
     }
 
     /* Identifiers and keywords */

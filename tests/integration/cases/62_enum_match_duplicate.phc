@@ -1,0 +1,18 @@
+#include <stdio.h>
+
+phc_enum Level {
+    Low,
+    Medium,
+    High
+};
+
+int main(void) {
+    Level l = Level_Low;
+    phc_match(Level, l) {
+        case Low: { printf("low\n"); } break;
+        case Medium: { printf("medium\n"); } break;
+        case High: { printf("high\n"); } break;
+        case Low: { printf("low again\n"); } break;
+    }
+    return 0;
+}

@@ -1,0 +1,19 @@
+#include <stdio.h>
+
+phc_enum Direction {
+    North,
+    South,
+    East,
+    West
+};
+
+int main(void) {
+    Direction d = Direction_East;
+    phc_match(Direction, d) {
+        case North: { printf("north\n"); } break;
+        case South: { printf("south\n"); } break;
+        case East: { printf("east\n"); } break;
+        case West: { printf("west\n"); } break;
+    }
+    return 0;
+}

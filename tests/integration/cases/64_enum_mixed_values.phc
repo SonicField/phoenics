@@ -1,0 +1,15 @@
+#include <stdio.h>
+
+/* Auto-increment from last explicit value */
+phc_enum Priority {
+    Critical = 10,
+    High,
+    Medium = 20,
+    Low
+};
+
+int main(void) {
+    printf("%d %d %d %d\n", Priority_Critical, Priority_High, Priority_Medium, Priority_Low);
+    printf("%s\n", Priority_to_string(Priority_High));
+    return 0;
+}

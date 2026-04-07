@@ -6,6 +6,7 @@
 typedef enum {
     TOK_EOF = 0,
     TOK_DESCR,        /* 'descr' keyword */
+    TOK_ENUM,         /* 'enum' keyword (phc_enum) */
     TOK_MATCH_DESCR,  /* 'match_descr' keyword */
     TOK_IDENT,        /* identifier */
     TOK_LBRACE,       /* { */
@@ -21,6 +22,8 @@ typedef enum {
     TOK_PHC_DEFER,    /* 'phc_defer' keyword */
     TOK_PHC_DEFER_CANCEL, /* 'phc_defer_cancel' keyword */
     TOK_RETURN,       /* 'return' keyword (scan mode, only when defer active) */
+    TOK_EQUALS,       /* = (for explicit enum values) */
+    TOK_NUMBER,       /* integer literal */
     TOK_OTHER         /* anything that isn't part of descr/match_descr syntax */
 } TokenType;
 

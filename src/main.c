@@ -34,6 +34,16 @@ static int emit_type_manifest(const char *path, const Program *prog) {
         return 0;
     }
     fprintf(f, "# phc type manifest v2 — machine generated, do not edit\n");
+    /* Emit enum types */
+    for (int i = 0; i < prog->enum_count; i++) {
+        const EnumDecl *e = &prog->enums[i];
+        fprintf(f, "enum %s", e->name);
+        for (int j = 0; j < e->value_count; j++) {
+            fprintf(f, " %s", e->values[j].name);
+        }
+        fprintf(f, "\n");
+    }
+    /* Emit descr types */
     for (int i = 0; i < prog->descr_count; i++) {
         const DescrDecl *d = &prog->descrs[i];
         fprintf(f, "descr %s", d->name);
@@ -80,7 +90,37 @@ static int load_type_manifest(const char *path,
         char *tok = strtok_r(line, " \t\n", &saveptr);
         if (!tok) continue;
 
-        if (strcmp(tok, "descr") == 0) {
+        if (strcmp(tok, "enum") == 0) {
+            tok = strtok_r(NULL, " \t\n", &saveptr);
+            if (!tok) {
+                fprintf(stderr, "phc: error: missing type name in manifest '%s'\n", path);
+                free(line);
+                fclose(f);
+                return 0;
+            }
+
+            DescrType dt;
+            memset(&dt, 0, sizeof(dt));
+            dt.name = strdup(tok);
+            dt.is_enum = 1;
+
+            int vcap = 0;
+            while ((tok = strtok_r(NULL, " \t\n", &saveptr)) != NULL) {
+                if (dt.variant_count >= vcap) {
+                    vcap = vcap ? vcap * 2 : 8;
+                    dt.variant_names = realloc(dt.variant_names,
+                                               sizeof(const char *) * (size_t)vcap);
+                }
+                dt.variant_names[dt.variant_count++] = strdup(tok);
+            }
+
+            if (*count >= *cap) {
+                *cap = *cap ? *cap * 2 : 8;
+                *types = realloc(*types, sizeof(DescrType) * (size_t)*cap);
+            }
+            (*types)[(*count)++] = dt;
+
+        } else if (strcmp(tok, "descr") == 0) {
             tok = strtok_r(NULL, " \t\n", &saveptr);
             if (!tok) {
                 fprintf(stderr, "phc: error: missing type name in manifest '%s'\n", path);

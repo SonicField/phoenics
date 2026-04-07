@@ -1,6 +1,6 @@
 # Phoenics Language Reference
 
-Phoenics adds discriminated unions to C11. `phc` translates Phoenics-extended C into standard C11. The output compiles with clang or gcc.
+Phoenics adds discriminated unions and enhanced enums to C11. `phc` translates Phoenics-extended C into standard C11. The output compiles with clang, gcc, or MSVC.
 
 Phoenics is for AI agents writing C. The syntax is unambiguous, explicit, and mechanically verifiable. Human ergonomics are secondary.
 
@@ -20,7 +20,7 @@ phc runs **after** the preprocessor in pipeline mode. `#include`, `#ifdef`, and 
 
 Everything that is not a Phoenics construct passes through byte-for-byte unchanged.
 
-Two reserved keywords: `phc_descr` and `phc_match`. All other C identifiers are unreserved.
+Reserved keywords: `phc_descr`, `phc_enum`, `phc_match`, `phc_defer`, `phc_defer_cancel`, `phc_free`. All other C identifiers are unreserved.
 
 ---
 
@@ -137,6 +137,127 @@ Asserts the tag at runtime via `abort()`, then returns the variant struct. Usage
 
 ---
 
+## `phc_enum` — Enhanced Enum
+
+C enums are integers with names. phc_enum adds what C forgot: string conversion and exhaustive matching.
+
+### Syntax
+
+```
+phc_enum <TypeName> {
+    <Name>,
+    <Name> = <integer>,
+    ...
+};
+```
+
+At least one value. Values separated by commas. Explicit integer assignment is optional — without it, values auto-increment from the previous value (starting at 0), matching C enum behaviour.
+
+### Example
+
+```c
+phc_enum Color {
+    Red,
+    Green,
+    Blue
+};
+```
+
+With explicit values (protocol/wire formats):
+
+```c
+phc_enum HttpStatus {
+    Ok = 200,
+    NotFound = 404,
+    ServerError = 500
+};
+```
+
+Mixed auto-increment and explicit:
+
+```c
+phc_enum Priority {
+    Low,           /* 0 */
+    Medium = 10,   /* 10 */
+    High,          /* 11 */
+    Critical = 20  /* 20 */
+};
+```
+
+### What phc generates
+
+Three things.
+
+**Enum typedef:**
+```c
+typedef enum {
+    Color_Red,
+    Color_Green,
+    Color_Blue,
+    Color__COUNT = 3
+} Color;
+```
+
+`__COUNT` is always the number of declared values, explicitly assigned. For contiguous 0-based enums this equals the next sequential value. For non-contiguous enums (HttpStatus), `__COUNT = 3` — the count of values, not one past the last.
+
+**String conversion (to_string):**
+```c
+static inline const char *Color_to_string(Color c) {
+    switch (c) {
+        case Color_Red: return "Red";
+        case Color_Green: return "Green";
+        case Color_Blue: return "Blue";
+        default: return "(unknown)";
+    }
+}
+```
+
+The strings match the source names exactly. No allocation. The default case handles values outside the enum range — this happens in C because enums are integers.
+
+**String parsing (from_string):**
+```c
+static inline int Color_from_string(const char *s, Color *out) {
+    if (strcmp(s, "Red") == 0) { *out = Color_Red; return 1; }
+    if (strcmp(s, "Green") == 0) { *out = Color_Green; return 1; }
+    if (strcmp(s, "Blue") == 0) { *out = Color_Blue; return 1; }
+    return 0;
+}
+```
+
+Returns 1 on match, 0 on failure. phc emits `extern int strcmp(const char *, const char *);` in the preamble.
+
+### Naming
+
+| What | Pattern | Example |
+|------|---------|---------|
+| Enum type | `<Type>` | `Color` |
+| Value | `<Type>_<Name>` | `Color_Red` |
+| Count | `<Type>__COUNT` | `Color__COUNT` |
+| To string | `<Type>_to_string` | `Color_to_string` |
+| From string | `<Type>_from_string` | `Color_from_string` |
+
+### Exhaustive matching
+
+phc_enum types work with `phc_match`. Every value must be covered:
+
+```c
+phc_match(Color, c) {
+    case Red: { printf("red\n"); } break;
+    case Green: { printf("green\n"); } break;
+    case Blue: { printf("blue\n"); } break;
+}
+```
+
+No destructuring — enum values carry no fields. Missing a value is a phc error. Adding a new value to a phc_enum breaks every phc_match on that type until updated.
+
+Generated C for enum matching uses `switch(expr)` directly (not `switch(expr.tag)` as with phc_descr, since enums are values, not structs).
+
+### Manifest support
+
+phc_enum types appear in type manifests (`--emit-types`). Cross-file exhaustiveness checking works the same as phc_descr.
+
+---
+
 ## `phc_match` — Exhaustive Match
 
 ### Syntax
@@ -151,7 +272,7 @@ phc_match(<TypeName>, <expr>) {
 
 Every variant must appear. Missing one is a phc error. Duplicates are an error. Unknown variant names are an error. No `default` — exhaustiveness is the point.
 
-The type must be a `phc_descr` declared in the same file or loaded via `--type-manifest`.
+The type must be a `phc_descr` or `phc_enum` declared in the same file or loaded via `--type-manifest`. Destructuring (binding fields) is available for `phc_descr` types only — `phc_enum` values carry no fields.
 
 ### Pattern destructuring
 
@@ -333,6 +454,8 @@ Recursive types require a forward declaration and pointer fields.
 | `unknown field '<F>' in variant '<V>' of '<T>'` | Destructuring names a nonexistent field |
 | `duplicate binding '<F>' in case '<V>'` | Same field bound twice in destructuring |
 | `cannot destructure external type '<T>' (field info not available)` | v1 manifest without field types |
+| `phc_enum '<T>' must have at least one value` | Empty enum declaration |
+| `cannot destructure enum type '<T>'` | Destructuring attempted on a phc_enum |
 
 ---
 

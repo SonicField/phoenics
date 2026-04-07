@@ -1,0 +1,19 @@
+#include <stdio.h>
+#include <string.h>
+
+phc_enum Color {
+    Red,
+    Green,
+    Blue
+};
+
+int main(void) {
+    Color c = Color_Green;
+    printf("%s\n", Color_to_string(c));
+
+    Color parsed;
+    if (Color_from_string("Blue", &parsed)) {
+        printf("%s\n", Color_to_string(parsed));
+    }
+    return 0;
+}

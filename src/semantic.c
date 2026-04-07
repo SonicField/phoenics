@@ -22,8 +22,8 @@ SemanticResult analyse(const Program *prog,
     SemanticResult sr;
     memset(&sr, 0, sizeof(sr));
 
-    /* Build type table from descr declarations + external types */
-    sr.descr_type_count = prog->descr_count + external_type_count;
+    /* Build type table from descr declarations + enum declarations + external types */
+    sr.descr_type_count = prog->descr_count + prog->enum_count + external_type_count;
     if (sr.descr_type_count > 0) {
         sr.descr_types = calloc((size_t)sr.descr_type_count, sizeof(DescrType));
     }
@@ -45,10 +45,24 @@ SemanticResult analyse(const Program *prog,
         }
     }
 
+    /* Copy enum types into type table */
+    for (int i = 0; i < prog->enum_count; i++) {
+        const EnumDecl *e = &prog->enums[i];
+        int idx = prog->descr_count + i;
+        sr.descr_types[idx].name = e->name;
+        sr.descr_types[idx].is_enum = 1;
+        sr.descr_types[idx].variant_count = e->value_count;
+        sr.descr_types[idx].variant_names =
+            calloc((size_t)e->value_count, sizeof(const char *));
+        for (int j = 0; j < e->value_count; j++) {
+            sr.descr_types[idx].variant_names[j] = e->values[j].name;
+        }
+    }
+
     /* Copy external types into type table */
     for (int i = 0; i < external_type_count; i++) {
         const DescrType *ext = &external_types[i];
-        int idx = prog->descr_count + i;
+        int idx = prog->descr_count + prog->enum_count + i;
         sr.descr_types[idx].name = ext->name;
         sr.descr_types[idx].variant_count = ext->variant_count;
         sr.descr_types[idx].variant_names =
@@ -89,6 +103,19 @@ SemanticResult analyse(const Program *prog,
                         sem_error(&sr, "field name '%s' in variant '%s' of '%s' is a C keyword",
                                   fname, d->variants[j].name, d->name);
                     }
+                }
+            }
+        }
+    }
+
+    /* Check for duplicate enum value names */
+    for (int i = 0; i < prog->enum_count && !sr.error; i++) {
+        const EnumDecl *e = &prog->enums[i];
+        for (int j = 0; j < e->value_count && !sr.error; j++) {
+            for (int k = j + 1; k < e->value_count && !sr.error; k++) {
+                if (strcmp(e->values[j].name, e->values[k].name) == 0) {
+                    sem_error(&sr, "duplicate value '%s' in phc_enum '%s'",
+                              e->values[j].name, e->name);
                 }
             }
         }
@@ -154,10 +181,16 @@ SemanticResult analyse(const Program *prog,
             }
         }
 
-        /* Validate destructuring bindings against descr field names */
+        /* Validate destructuring bindings against descr field names.
+         * Enum types have no fields — reject destructuring on them. */
         for (int i = 0; i < m->case_count && !sr.error; i++) {
             const MatchCase *mc = &m->cases[i];
             if (mc->binding_count == 0) continue;
+            if (dt->is_enum) {
+                sem_error(&sr, "cannot destructure enum type '%s' — enum values have no fields",
+                          m->type_name);
+                break;
+            }
 
             /* Check for duplicate bindings */
             for (int b1 = 0; b1 < mc->binding_count && !sr.error; b1++) {

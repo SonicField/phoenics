@@ -24,6 +24,20 @@ typedef struct {
     char *end_file;     /* source filename (NULL in direct mode) */
 } DescrDecl;
 
+typedef struct {
+    char *name;
+    int has_value;      /* nonzero if explicit value assigned */
+    int value;          /* explicit integer value (only if has_value) */
+} EnumValue;
+
+typedef struct {
+    char *name;
+    EnumValue *values;
+    int value_count;
+    int end_line;
+    char *end_file;
+} EnumDecl;
+
 /* Forward declaration — Chunk is defined below */
 typedef struct Chunk Chunk;
 
@@ -59,6 +73,7 @@ typedef struct {
 typedef enum {
     CHUNK_PASSTHROUGH,
     CHUNK_DESCR,
+    CHUNK_ENUM,
     CHUNK_MATCH_DESCR,
     CHUNK_DEFER,
     CHUNK_DEFER_CANCEL,
@@ -71,6 +86,7 @@ struct Chunk {
     union {
         struct { size_t start; size_t end; } passthrough;
         int descr_index;
+        int enum_index;
         MatchDescr match;
         DeferBlock defer;
         ReturnStmt ret;
@@ -83,6 +99,8 @@ typedef struct {
     size_t source_len;
     DescrDecl *descrs;
     int descr_count;
+    EnumDecl *enums;
+    int enum_count;
     Chunk *chunks;
     int chunk_count;
     DeferBlock *defers;     /* all defer blocks (referenced by chunks) */

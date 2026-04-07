@@ -33,6 +33,10 @@ typedef struct {
     int descr_count;
     int descr_cap;
 
+    EnumDecl *enums;
+    int enum_count;
+    int enum_cap;
+
     Chunk *chunks;
     int chunk_count;
     int chunk_cap;
@@ -361,6 +365,118 @@ static int parse_descr(Parser *p) {
     return 1;
 }
 
+/* --- enum parsing --- */
+
+static int parse_enum(Parser *p) {
+    if (p->cur.type != TOK_IDENT) {
+        parser_error(p, "expected type name after 'phc_enum'");
+        return 0;
+    }
+
+    EnumDecl e;
+    memset(&e, 0, sizeof(e));
+    e.name = strndup(p->cur.value, p->cur.length);
+    next_token(p);
+
+    if (p->cur.type != TOK_LBRACE) {
+        parser_error(p, "expected '{' after enum type name");
+        free(e.name);
+        return 0;
+    }
+    next_token(p);
+
+    int value_cap = 0;
+    int first = 1;
+    while (p->cur.type != TOK_RBRACE && p->cur.type != TOK_EOF) {
+        if (!first) {
+            if (p->cur.type == TOK_COMMA) {
+                next_token(p);
+                if (p->cur.type == TOK_RBRACE) break;
+            }
+        }
+        first = 0;
+
+        if (p->cur.type != TOK_IDENT) {
+            parser_error(p, "expected enum value name");
+            free(e.name);
+            for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+            free(e.values);
+            return 0;
+        }
+
+        EnumValue ev;
+        memset(&ev, 0, sizeof(ev));
+        ev.name = strndup(p->cur.value, p->cur.length);
+        next_token(p);
+
+        /* Optional explicit value: = integer */
+        if (p->cur.type == TOK_EQUALS) {
+            next_token(p);
+            if (p->cur.type != TOK_NUMBER) {
+                parser_error(p, "expected integer after '=' in enum value");
+                free(ev.name);
+                free(e.name);
+                for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+                free(e.values);
+                return 0;
+            }
+            ev.has_value = 1;
+            /* Parse integer (decimal or hex) */
+            if (p->cur.length > 2 && p->cur.value[0] == '0' &&
+                (p->cur.value[1] == 'x' || p->cur.value[1] == 'X')) {
+                ev.value = (int)strtol(p->cur.value, NULL, 16);
+            } else {
+                ev.value = (int)strtol(p->cur.value, NULL, 10);
+            }
+            next_token(p);
+        }
+
+        DA_PUSH(e.values, e.value_count, value_cap, ev);
+    }
+
+    if (e.value_count == 0) {
+        parser_error(p, "phc_enum '%s' must have at least one value", e.name);
+        free(e.name);
+        free(e.values);
+        return 0;
+    }
+
+    if (!expect(p, TOK_RBRACE)) {
+        free(e.name);
+        for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+        free(e.values);
+        return 0;
+    }
+    if (p->cur.type != TOK_SEMICOLON) {
+        parser_error(p, "expected ';' after phc_enum declaration");
+        free(e.name);
+        for (int i = 0; i < e.value_count; i++) free(e.values[i].name);
+        free(e.values);
+        return 0;
+    }
+    size_t end_pos = p->cur.pos + 1;
+    next_token(p);
+    if (p->lex.marker_seen) {
+        e.end_line = p->cur.orig_line + 1;
+        e.end_file = strndup(p->lex.orig_file, p->lex.orig_file_len);
+    } else {
+        e.end_line = p->cur.line + 1;
+        e.end_file = NULL;
+    }
+
+    int idx = p->enum_count;
+    DA_PUSH(p->enums, p->enum_count, p->enum_cap, e);
+
+    Chunk c;
+    memset(&c, 0, sizeof(c));
+    c.type = CHUNK_ENUM;
+    c.enum_index = idx;
+    DA_PUSH(p->chunks, p->chunk_count, p->chunk_cap, c);
+
+    p->passthrough_start = end_pos;
+    return 1;
+}
+
 /* --- match_descr parsing --- */
 
 static int parse_match_descr(Parser *p, size_t keyword_pos) {
@@ -571,6 +687,10 @@ ParseResult parse(const char *source) {
             add_passthrough(&p, p.passthrough_start, p.cur.pos);
             next_token(&p);
             parse_descr(&p);
+        } else if (p.cur.type == TOK_ENUM) {
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            next_token(&p);
+            parse_enum(&p);
         } else if (p.cur.type == TOK_MATCH_DESCR) {
             add_passthrough(&p, p.passthrough_start, p.cur.pos);
             size_t kw_pos = p.cur.pos;
@@ -727,6 +847,8 @@ ParseResult parse(const char *source) {
     result.program.source_len = p.source_len;
     result.program.descrs = p.descrs;
     result.program.descr_count = p.descr_count;
+    result.program.enums = p.enums;
+    result.program.enum_count = p.enum_count;
     result.program.chunks = p.chunks;
     result.program.chunk_count = p.chunk_count;
     result.program.defers = p.defers;
@@ -753,6 +875,15 @@ void parse_result_free(ParseResult *result) {
         free(d->end_file);
     }
     free(result->program.descrs);
+    for (int i = 0; i < result->program.enum_count; i++) {
+        EnumDecl *e = &result->program.enums[i];
+        free(e->name);
+        for (int j = 0; j < e->value_count; j++)
+            free(e->values[j].name);
+        free(e->values);
+        free(e->end_file);
+    }
+    free(result->program.enums);
     for (int i = 0; i < result->program.chunk_count; i++) {
         Chunk *c = &result->program.chunks[i];
         if (c->type == CHUNK_MATCH_DESCR) {

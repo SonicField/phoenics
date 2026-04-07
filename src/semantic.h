@@ -10,6 +10,7 @@ typedef struct {
     /* Field info per variant (NULL if unavailable, e.g., v1 manifest) */
     Field **variant_fields;     /* array of Field arrays, one per variant */
     int *variant_field_counts;  /* field count per variant */
+    int is_enum;                /* nonzero if this is a phc_enum type */
 } DescrType;
 
 typedef struct {

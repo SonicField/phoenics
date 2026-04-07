@@ -1,0 +1,18 @@
+#include <stdio.h>
+
+phc_enum Season {
+    Spring,
+    Summer,
+    Autumn,
+    Winter
+};
+
+int main(void) {
+    Season s = Season_Spring;
+    /* Missing Autumn and Winter — phc must reject this */
+    phc_match(Season, s) {
+        case Spring: { printf("spring\n"); } break;
+        case Summer: { printf("summer\n"); } break;
+    }
+    return 0;
+}

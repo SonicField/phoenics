@@ -1,0 +1,25 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+phc_enum Action {
+    Start,
+    Stop,
+    Pause
+};
+
+const char *describe_action(Action a) {
+    char *buf = malloc(64);
+    phc_defer { free(buf); }
+
+    phc_match(Action, a) {
+        case Start: { return "starting"; } break;
+        case Stop: { return "stopping"; } break;
+        case Pause: { return "pausing"; } break;
+    }
+    return "unknown";
+}
+
+int main(void) {
+    printf("%s\n", describe_action(Action_Stop));
+    return 0;
+}

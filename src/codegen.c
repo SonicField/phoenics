@@ -95,6 +95,53 @@ static void emit_descr(Buffer *buf, const DescrDecl *d) {
     }
 }
 
+/* --- enum codegen --- */
+
+static void emit_enum(Buffer *buf, const EnumDecl *e) {
+    /* Enum typedef */
+    buf_printf(buf, "typedef enum {\n");
+    for (int i = 0; i < e->value_count; i++) {
+        buf_printf(buf, "    %s_%s", e->name, e->values[i].name);
+        if (e->values[i].has_value) {
+            buf_printf(buf, " = %d", e->values[i].value);
+        }
+        buf_append(buf, ",\n");
+    }
+    /* __COUNT = number of declared values (not auto-increment) */
+    buf_printf(buf, "    %s__COUNT = %d\n", e->name, e->value_count);
+    buf_printf(buf, "} %s;\n", e->name);
+
+    /* to_string */
+    buf_printf(buf, "\nstatic inline const char *%s_to_string(%s c) {\n", e->name, e->name);
+    buf_append(buf, "    switch (c) {\n");
+    for (int i = 0; i < e->value_count; i++) {
+        buf_printf(buf, "        case %s_%s: return \"%s\";\n",
+                   e->name, e->values[i].name, e->values[i].name);
+    }
+    buf_append(buf, "        default: return \"(unknown)\";\n");
+    buf_append(buf, "    }\n");
+    buf_append(buf, "}\n");
+
+    /* from_string */
+    buf_printf(buf, "\nstatic inline int %s_from_string(const char *s, %s *out) {\n",
+               e->name, e->name);
+    for (int i = 0; i < e->value_count; i++) {
+        buf_printf(buf, "    if (strcmp(s, \"%s\") == 0) { *out = %s_%s; return 1; }\n",
+                   e->values[i].name, e->name, e->values[i].name);
+    }
+    buf_append(buf, "    return 0;\n");
+    buf_append(buf, "}");
+}
+
+/* Check if a type name is a phc_enum */
+static int is_enum_type(const char *type_name,
+                        const EnumDecl *enums, int enum_count) {
+    for (int i = 0; i < enum_count; i++) {
+        if (strcmp(enums[i].name, type_name) == 0) return 1;
+    }
+    return 0;
+}
+
 /* --- match_descr codegen --- */
 
 /* Find a field in a variant by field name */
@@ -268,17 +315,22 @@ static void emit_body_with_defer(Buffer *buf, const char *body, int defer_count,
 static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
                          const char *source, const DescrDecl *descrs, int descr_count,
                          const DescrType *ext_types, int ext_count,
+                         const EnumDecl *enums, int enum_count,
                          int active_defer_count,
                          const char **defer_bodies, int defer_body_count);
 
 static void emit_match_descr(Buffer *buf, const MatchDescr *m,
                               const DescrDecl *descrs, int descr_count,
                               const DescrType *ext_types, int ext_count,
+                              const EnumDecl *enums, int enum_count,
                               int active_defer_count,
                               const char **defer_bodies, int defer_body_count) {
+    int match_is_enum = is_enum_type(m->type_name, enums, enum_count);
     buf_append(buf, "switch (");
     buf_append(buf, m->expr_text);
-    buf_append(buf, ".tag) {\n");
+    if (!match_is_enum)
+        buf_append(buf, ".tag");
+    buf_append(buf, ") {\n");
 
     for (int i = 0; i < m->case_count; i++) {
         const MatchCase *mc = &m->cases[i];
@@ -294,7 +346,7 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
             }
             emit_chunks(buf, (const Chunk *)mc->body_chunks, mc->body_chunk_count,
                         mc->body_text, descrs, descr_count,
-                        ext_types, ext_count,
+                        ext_types, ext_count, enums, enum_count,
                         active_defer_count, defer_bodies, defer_body_count);
             if (mc->binding_count > 0)
                 buf_append(buf, " }\n");
@@ -323,6 +375,7 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
 static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
                          const char *source, const DescrDecl *descrs, int descr_count,
                          const DescrType *ext_types, int ext_count,
+                         const EnumDecl *enums, int enum_count,
                          int active_defer_count,
                          const char **defer_bodies, int defer_body_count) {
     for (int i = 0; i < chunk_count; i++) {
@@ -346,8 +399,11 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
             break;
         case CHUNK_MATCH_DESCR:
             emit_match_descr(buf, &c->match, descrs, descr_count,
-                            ext_types, ext_count,
+                            ext_types, ext_count, enums, enum_count,
                             active_defer_count, defer_bodies, defer_body_count);
+            break;
+        case CHUNK_ENUM:
+            /* Not expected in case bodies, but handle gracefully */
             break;
         case CHUNK_DEFER:
             /* Track but don't emit — handled at CHUNK_RETURN/CHUNK_FUNC_END */
@@ -418,6 +474,10 @@ char *codegen(const Program *prog,
             break;
         }
     }
+    /* Declare strcmp() for enum from_string functions */
+    if (prog->enum_count > 0) {
+        buf_append(&buf, "extern int strcmp(const char *, const char *);\n");
+    }
 
     for (int i = 0; i < prog->chunk_count; i++) {
         const Chunk *c = &prog->chunks[i];
@@ -438,6 +498,15 @@ char *codegen(const Program *prog,
                 else
                     buf_printf(&buf, "\n#line %d", d->end_line);
             }
+            break;
+        }
+        case CHUNK_ENUM: {
+            const EnumDecl *e = &prog->enums[c->enum_index];
+            emit_enum(&buf, e);
+            if (e->end_file)
+                buf_printf(&buf, "\n#line %d \"%s\"", e->end_line, e->end_file);
+            else
+                buf_printf(&buf, "\n#line %d", e->end_line);
             break;
         }
         case CHUNK_MATCH_DESCR: {
@@ -463,6 +532,7 @@ char *codegen(const Program *prog,
             }
             emit_match_descr(&buf, &c->match, prog->descrs, prog->descr_count,
                             external_types, external_type_count,
+                            prog->enums, prog->enum_count,
                             active_defers, dbodies, dbody_count);
             free(dbodies);
             if (c->match.end_file)
