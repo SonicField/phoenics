@@ -153,7 +153,74 @@ else
     fail "prerequisite files missing"
 fi
 
-# === Test 10: Double-include (include guard works) ===
+# === Test 10: Cross-file enum matching via header + manifest ===
+run_test "cross_file_enum_match"
+cat > "$TMPDIR/enum_user.phc" <<'EOF'
+#include "colors.phc.h"
+#include <stdio.h>
+
+int main(void) {
+    Color c = Color_Green;
+    phc_match(Color, c) {
+        case Red: { printf("red\n"); } break;
+        case Green: { printf("green\n"); } break;
+        case Blue: { printf("blue\n"); } break;
+    }
+    return 0;
+}
+EOF
+if [ -f "$TMPDIR/colors.phc.h" ] && [ -f "$TMPDIR/colors.phc-types" ]; then
+    if $CC -x c -E -I"$TMPDIR" "$TMPDIR/enum_user.phc" 2>/dev/null | \
+       "$PHC" --type-manifest="$TMPDIR/colors.phc-types" > "$TMPDIR/enum_user.c" 2>/dev/null; then
+        if $CC $CFLAGS -Wno-gnu-line-marker -I"$TMPDIR" -o "$TMPDIR/enum_user" "$TMPDIR/enum_user.c" 2>/dev/null; then
+            actual=$("$TMPDIR/enum_user" 2>/dev/null)
+            if [ "$actual" = "green" ]; then
+                pass
+            else
+                fail "wrong output: $actual"
+            fi
+        else
+            fail "does not compile"
+        fi
+    else
+        fail "phc failed"
+    fi
+else
+    fail "prerequisite files missing"
+fi
+
+# === Test 11: Cross-file flags matching via header + manifest ===
+run_test "cross_file_flags_match"
+cat > "$TMPDIR/flags_user.c" <<'EOF'
+#include "perms.phc.h"
+#include <stdio.h>
+
+int main(void) {
+    Permissions p = Permissions_Read | Permissions_Write;
+    if (Permissions_has(p, Permissions_Read)) printf("can read\n");
+    if (Permissions_has(p, Permissions_Execute)) printf("can exec\n");
+    char buf[Permissions__MAX_STRING + 1];
+    printf("str: %s\n", Permissions_to_string(p, buf, sizeof(buf)));
+    return 0;
+}
+EOF
+if [ -f "$TMPDIR/perms.phc.h" ]; then
+    if $CC $CFLAGS -Wno-gnu-line-marker -I"$TMPDIR" -o "$TMPDIR/flags_user" "$TMPDIR/flags_user.c" 2>/dev/null; then
+        actual=$("$TMPDIR/flags_user" 2>/dev/null)
+        expected=$(printf "can read\nstr: Read|Write")
+        if [ "$actual" = "$expected" ]; then
+            pass
+        else
+            fail "wrong output: $actual"
+        fi
+    else
+        fail "does not compile"
+    fi
+else
+    fail "prerequisite files missing"
+fi
+
+# === Test 12: Double-include (include guard works) ===
 run_test "double_include_guard"
 cat > "$TMPDIR/double.c" <<'EOF'
 #include "shapes.phc.h"

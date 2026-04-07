@@ -201,11 +201,16 @@ static void emit_flags(Buffer *buf, const EnumDecl *f) {
     buf_append(buf, "}");
 }
 
-/* Check if a type name is a phc_enum */
+/* Check if a type name is a phc_enum (local or external) */
 static int is_enum_type(const char *type_name,
-                        const EnumDecl *enums, int enum_count) {
+                        const EnumDecl *enums, int enum_count,
+                        const DescrType *ext_types, int ext_count) {
     for (int i = 0; i < enum_count; i++) {
         if (strcmp(enums[i].name, type_name) == 0) return 1;
+    }
+    for (int i = 0; i < ext_count; i++) {
+        if (ext_types[i].is_enum && strcmp(ext_types[i].name, type_name) == 0)
+            return 1;
     }
     return 0;
 }
@@ -393,7 +398,8 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
                               const EnumDecl *enums, int enum_count,
                               int active_defer_count,
                               const char **defer_bodies, int defer_body_count) {
-    int match_is_enum = is_enum_type(m->type_name, enums, enum_count);
+    int match_is_enum = is_enum_type(m->type_name, enums, enum_count,
+                                     ext_types, ext_count);
     buf_append(buf, "switch (");
     buf_append(buf, m->expr_text);
     if (!match_is_enum)
