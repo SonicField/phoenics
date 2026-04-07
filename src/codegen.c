@@ -720,3 +720,66 @@ char *codegen(const Program *prog,
 
     return buf_finish(&buf);
 }
+
+/* --- Header generation --- */
+
+char *codegen_header(const Program *prog, const char *guard_name) {
+    Buffer buf;
+    buf_init(&buf);
+
+    /* Include guard */
+    buf_printf(&buf, "#ifndef %s\n", guard_name);
+    buf_printf(&buf, "#define %s\n\n", guard_name);
+
+    /* Preamble: extern declarations needed by generated code */
+    int has_descr = 0;
+    for (int i = 0; i < prog->descr_count; i++) {
+        if (prog->descrs[i].variant_count >= 0) { has_descr = 1; break; }
+    }
+    if (has_descr) {
+        buf_append(&buf, "extern void abort(void);\n");
+    }
+    if (prog->enum_count > 0) {
+        buf_append(&buf, "extern int strcmp(const char *, const char *);\n");
+    }
+    if (prog->flags_count > 0) {
+        buf_append(&buf, "extern int snprintf(char *, unsigned long, const char *, ...);\n");
+    }
+    buf_append(&buf, "\n");
+
+    /* Emit all types in declaration order (following chunk order) */
+    for (int i = 0; i < prog->chunk_count; i++) {
+        const Chunk *c = &prog->chunks[i];
+        switch (c->type) {
+        case CHUNK_DESCR: {
+            const DescrDecl *d = &prog->descrs[c->descr_index];
+            if (d->variant_count < 0) {
+                buf_printf(&buf, "typedef struct %s %s;\n", d->name, d->name);
+            } else {
+                emit_descr(&buf, d);
+                buf_append(&buf, "\n\n");
+            }
+            break;
+        }
+        case CHUNK_ENUM: {
+            const EnumDecl *e = &prog->enums[c->enum_index];
+            emit_enum(&buf, e);
+            buf_append(&buf, "\n\n");
+            break;
+        }
+        case CHUNK_FLAGS: {
+            const EnumDecl *f = &prog->flags[c->flags_index];
+            emit_flags(&buf, f);
+            buf_append(&buf, "\n\n");
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    /* Close include guard */
+    buf_printf(&buf, "#endif /* %s */\n", guard_name);
+
+    return buf_finish(&buf);
+}

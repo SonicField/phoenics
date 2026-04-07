@@ -255,6 +255,7 @@ static void free_match_contents(MatchDescr *m) {
     free(m->cases);
     free(m->type_name);
     free(m->expr_text);
+    free(m->end_file);
 }
 
 /* --- descr parsing --- */

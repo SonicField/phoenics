@@ -69,6 +69,49 @@ static int emit_type_manifest(const char *path, const Program *prog) {
         }
     }
     fclose(f);
+
+    /* Generate companion .phc.h header file.
+     * Derive header path: replace .phc-types with .phc.h */
+    size_t path_len = strlen(path);
+    const char *suffix = ".phc-types";
+    size_t suffix_len = strlen(suffix);
+    char *header_path = NULL;
+    if (path_len > suffix_len &&
+        strcmp(path + path_len - suffix_len, suffix) == 0) {
+        header_path = malloc(path_len - suffix_len + 7); /* .phc.h + null */
+        memcpy(header_path, path, path_len - suffix_len);
+        strcpy(header_path + path_len - suffix_len, ".phc.h");
+    } else {
+        /* Fallback: append .h */
+        header_path = malloc(path_len + 3);
+        sprintf(header_path, "%s.h", path);
+    }
+
+    /* Build include guard name from header filename */
+    const char *base = header_path;
+    for (const char *p = header_path; *p; p++) {
+        if (*p == '/') base = p + 1;
+    }
+    char guard[256];
+    snprintf(guard, sizeof(guard), "PHC_%s", base);
+    for (char *g = guard; *g; g++) {
+        if (*g == '.' || *g == '-' || *g == ' ') *g = '_';
+        else if (*g >= 'a' && *g <= 'z') *g = (char)(*g - 'a' + 'A');
+    }
+
+    char *header = codegen_header(prog, guard);
+    if (header) {
+        FILE *hf = fopen(header_path, "w");
+        if (hf) {
+            fputs(header, hf);
+            fclose(hf);
+        } else {
+            fprintf(stderr, "phc: warning: cannot write header '%s'\n", header_path);
+        }
+        free(header);
+    }
+    free(header_path);
+
     return 1;
 }
 

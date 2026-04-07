@@ -447,21 +447,59 @@ Add a variant to a `phc_descr` and every `phc_match` on that type breaks until u
 
 ## Multi-file Support
 
-### Emitting type manifests
+### Emitting type manifests and headers
 
 ```bash
 phc --emit-types=shapes.phc-types < shapes.phc > shapes.c
 ```
 
-Generates a manifest file listing all `phc_descr` types with their variants and field types (v2 format).
+Generates two files:
 
-### Using type manifests
+1. **`shapes.phc-types`** — type manifest for exhaustiveness checking (variant names, field types).
+2. **`shapes.phc.h`** — generated C header containing the full type definitions: typedef, constructors, accessors, to_string/from_string, helpers. Self-contained with include guard.
+
+The manifest carries metadata. The header carries code. Both are machine-generated.
+
+### Using shared types
+
+A consuming file needs both: the manifest for phc's exhaustiveness checker, and the header for the C compiler.
 
 ```bash
 phc --type-manifest=shapes.phc-types < main.phc > main.c
 ```
 
-Loads external type definitions for exhaustiveness checking and pattern destructuring in `phc_match`.
+In the `.phc` source:
+
+```c
+#include "shapes.phc.h"   /* C preprocessor pulls in the generated types */
+
+void draw(Shape s) {
+    phc_match(Shape, s) {
+        case Circle(radius): { /* ... */ } break;
+        case Rectangle(width, height): { /* ... */ } break;
+    }
+}
+```
+
+The `#include` gives the C compiler the type definitions. The `--type-manifest` gives phc the type metadata for exhaustiveness checking and destructuring. Both are required for cross-file matching.
+
+### Generated header format
+
+The `.phc.h` file contains all types declared in the source — `phc_descr`, `phc_enum`, and `phc_flags` — wrapped in an include guard:
+
+```c
+#ifndef PHC_SHAPES_PHC_H
+#define PHC_SHAPES_PHC_H
+
+extern void abort(void);
+
+typedef enum { Shape_Circle, Shape_Rectangle, Shape__COUNT = 2 } Shape_Tag;
+/* ... full generated C for all types ... */
+
+#endif /* PHC_SHAPES_PHC_H */
+```
+
+Multiple inclusion is safe. Static inline functions (constructors, accessors) are per-translation-unit — no linker conflicts.
 
 ### Manifest v2 format
 

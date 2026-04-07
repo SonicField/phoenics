@@ -12,4 +12,11 @@
 char *codegen(const Program *program,
               const DescrType *external_types, int external_type_count);
 
+/*
+ * Generate a self-contained C11 header for all types in the program.
+ * Includes an include guard based on guard_name.
+ * Returns a malloc'd string; caller must free.
+ */
+char *codegen_header(const Program *program, const char *guard_name);
+
 #endif /* PHC_CODEGEN_H */
