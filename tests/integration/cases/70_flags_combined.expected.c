@@ -1,4 +1,3 @@
-extern int snprintf(char *, unsigned long, const char *, ...);
 #include <stdio.h>
 
 typedef unsigned int Color;
@@ -22,12 +21,25 @@ static inline Color Color_clear(Color flags, Color flag) {
 }
 
 static inline const char *Color_to_string(Color p, char *buf, unsigned long len) {
-    buf[0] = '\0';
-    unsigned long pos = 0;
-    if (p & Color_Red) { pos += snprintf(buf + pos, len - pos, "%sRed", pos ? "|" : ""); }
-    if (p & Color_Green) { pos += snprintf(buf + pos, len - pos, "%sGreen", pos ? "|" : ""); }
-    if (p & Color_Blue) { pos += snprintf(buf + pos, len - pos, "%sBlue", pos ? "|" : ""); }
-    if (pos == 0) { snprintf(buf, len, "(none)"); }
+    if (len == 0) return buf;
+    char *pos = buf;
+    char *end = buf + len - 1;
+    if (p & Color_Red) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Red"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Color_Green) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Green"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Color_Blue) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Blue"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (pos == buf) {
+        const char *s = "(none)"; while (*s && pos < end) *pos++ = *s++;
+    }
+    *pos = '\0';
     return buf;
 }
 #line 8

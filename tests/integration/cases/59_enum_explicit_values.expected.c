@@ -1,4 +1,6 @@
+#ifndef strcmp
 extern int strcmp(const char *, const char *);
+#endif
 typedef enum {
     HttpStatus_OK = 200,
     HttpStatus_NotFound = 404,

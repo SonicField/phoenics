@@ -1,4 +1,5 @@
-extern int snprintf(char *, unsigned long, const char *, ...);
+#include <stdio.h>
+
 typedef unsigned int HwReg;
 #define HwReg_Enable (0x01u)
 #define HwReg_Ready (0x02u)
@@ -20,12 +21,25 @@ static inline HwReg HwReg_clear(HwReg flags, HwReg flag) {
 }
 
 static inline const char *HwReg_to_string(HwReg p, char *buf, unsigned long len) {
-    buf[0] = '\0';
-    unsigned long pos = 0;
-    if (p & HwReg_Enable) { pos += snprintf(buf + pos, len - pos, "%sEnable", pos ? "|" : ""); }
-    if (p & HwReg_Ready) { pos += snprintf(buf + pos, len - pos, "%sReady", pos ? "|" : ""); }
-    if (p & HwReg_Error) { pos += snprintf(buf + pos, len - pos, "%sError", pos ? "|" : ""); }
-    if (pos == 0) { snprintf(buf, len, "(none)"); }
+    if (len == 0) return buf;
+    char *pos = buf;
+    char *end = buf + len - 1;
+    if (p & HwReg_Enable) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Enable"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & HwReg_Ready) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Ready"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & HwReg_Error) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Error"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (pos == buf) {
+        const char *s = "(none)"; while (*s && pos < end) *pos++ = *s++;
+    }
+    *pos = '\0';
     return buf;
 }
-#line 6
+#line 8

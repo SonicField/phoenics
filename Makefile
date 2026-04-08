@@ -89,6 +89,19 @@ test-asan: clean
 	@echo "=== ASan Build + Test ==="
 	$(MAKE) test CFLAGS="-std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -pedantic -g -fsanitize=address -fno-omit-frame-pointer"
 
+# Valgrind: catches uninitialised reads, leaks, and subtle memory errors
+# Stronger than ASan for uninitialised value tracking
+test-valgrind: $(BUILDDIR)/phc test-unit
+	@echo "=== Valgrind Tests ==="
+	@fail=0; \
+	for t in $(BUILDDIR)/test_*; do \
+		echo "--- valgrind $$(basename $$t) ---"; \
+		valgrind --leak-check=full --errors-for-leak-kinds=all --error-exitcode=1 \
+			--quiet $$t || fail=1; \
+	done; \
+	if [ $$fail -eq 1 ]; then echo "VALGRIND FAILED"; exit 1; fi
+	@echo "=== Valgrind clean ==="
+
 # MSVC compatibility: verify phc output compiles with strict C11 (no POSIX)
 test-msvc-compat: $(BUILDDIR)/phc
 	@echo "=== MSVC Compatibility Test ==="

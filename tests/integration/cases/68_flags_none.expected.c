@@ -1,4 +1,3 @@
-extern int snprintf(char *, unsigned long, const char *, ...);
 #include <stdio.h>
 
 typedef unsigned int Status;
@@ -22,12 +21,25 @@ static inline Status Status_clear(Status flags, Status flag) {
 }
 
 static inline const char *Status_to_string(Status p, char *buf, unsigned long len) {
-    buf[0] = '\0';
-    unsigned long pos = 0;
-    if (p & Status_Active) { pos += snprintf(buf + pos, len - pos, "%sActive", pos ? "|" : ""); }
-    if (p & Status_Pending) { pos += snprintf(buf + pos, len - pos, "%sPending", pos ? "|" : ""); }
-    if (p & Status_Closed) { pos += snprintf(buf + pos, len - pos, "%sClosed", pos ? "|" : ""); }
-    if (pos == 0) { snprintf(buf, len, "(none)"); }
+    if (len == 0) return buf;
+    char *pos = buf;
+    char *end = buf + len - 1;
+    if (p & Status_Active) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Active"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Status_Pending) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Pending"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Status_Closed) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Closed"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (pos == buf) {
+        const char *s = "(none)"; while (*s && pos < end) *pos++ = *s++;
+    }
+    *pos = '\0';
     return buf;
 }
 #line 8

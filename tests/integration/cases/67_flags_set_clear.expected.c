@@ -1,4 +1,3 @@
-extern int snprintf(char *, unsigned long, const char *, ...);
 #include <stdio.h>
 
 typedef unsigned int Mode;
@@ -22,12 +21,25 @@ static inline Mode Mode_clear(Mode flags, Mode flag) {
 }
 
 static inline const char *Mode_to_string(Mode p, char *buf, unsigned long len) {
-    buf[0] = '\0';
-    unsigned long pos = 0;
-    if (p & Mode_Verbose) { pos += snprintf(buf + pos, len - pos, "%sVerbose", pos ? "|" : ""); }
-    if (p & Mode_Debug) { pos += snprintf(buf + pos, len - pos, "%sDebug", pos ? "|" : ""); }
-    if (p & Mode_Strict) { pos += snprintf(buf + pos, len - pos, "%sStrict", pos ? "|" : ""); }
-    if (pos == 0) { snprintf(buf, len, "(none)"); }
+    if (len == 0) return buf;
+    char *pos = buf;
+    char *end = buf + len - 1;
+    if (p & Mode_Verbose) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Verbose"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Mode_Debug) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Debug"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Mode_Strict) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Strict"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (pos == buf) {
+        const char *s = "(none)"; while (*s && pos < end) *pos++ = *s++;
+    }
+    *pos = '\0';
     return buf;
 }
 #line 8

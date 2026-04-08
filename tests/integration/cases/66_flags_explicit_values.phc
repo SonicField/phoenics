@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 phc_flags HwReg {
     Enable = 0x01,
     Ready = 0x02,

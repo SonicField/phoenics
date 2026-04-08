@@ -1,4 +1,6 @@
+#ifndef abort
 extern void abort(void);
+#endif
 #define phc_free(pp) do { free(*(pp)); *(pp) = ((void*)0); } while(0)
 #include <stdio.h>
 #include <assert.h>

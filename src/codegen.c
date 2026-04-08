@@ -187,16 +187,23 @@ static void emit_flags(Buffer *buf, const EnumDecl *f) {
     buf_append(buf, "    return flags & ~flag;\n");
     buf_append(buf, "}\n");
 
-    /* to_string — caller-provided buffer, snprintf */
+    /* to_string — caller-provided buffer, raw char* processing (no snprintf) */
     buf_printf(buf, "\nstatic inline const char *%s_to_string(%s p, char *buf, unsigned long len) {\n",
                f->name, f->name);
-    buf_append(buf, "    buf[0] = '\\0';\n");
-    buf_append(buf, "    unsigned long pos = 0;\n");
+    buf_append(buf, "    if (len == 0) return buf;\n");
+    buf_append(buf, "    char *pos = buf;\n");
+    buf_append(buf, "    char *end = buf + len - 1;\n");
     for (int i = 0; i < f->value_count; i++) {
-        buf_printf(buf, "    if (p & %s_%s) { pos += snprintf(buf + pos, len - pos, \"%%s%s\", pos ? \"|\" : \"\"); }\n",
-                   f->name, f->values[i].name, f->values[i].name);
+        buf_printf(buf, "    if (p & %s_%s) {\n", f->name, f->values[i].name);
+        buf_append(buf, "        if (pos != buf && pos < end) *pos++ = '|';\n");
+        buf_printf(buf, "        { const char *s = \"%s\"; while (*s && pos < end) *pos++ = *s++; }\n",
+                   f->values[i].name);
+        buf_append(buf, "    }\n");
     }
-    buf_append(buf, "    if (pos == 0) { snprintf(buf, len, \"(none)\"); }\n");
+    buf_append(buf, "    if (pos == buf) {\n");
+    buf_append(buf, "        const char *s = \"(none)\"; while (*s && pos < end) *pos++ = *s++;\n");
+    buf_append(buf, "    }\n");
+    buf_append(buf, "    *pos = '\\0';\n");
     buf_append(buf, "    return buf;\n");
     buf_append(buf, "}");
 }
@@ -537,25 +544,24 @@ char *codegen(const Program *prog,
     Buffer buf;
     buf_init(&buf);
 
-    /* Declare abort() for safe accessor functions. Use a direct declaration
-     * instead of #include <stdlib.h> to avoid double-inclusion when phc runs
-     * post-preprocessor (cc -E | phc | cc — stdlib.h is already expanded). */
-    /* Emit abort() declaration only if there are full descr definitions
-     * (not just forward declarations) */
+    /* Declare standard library functions via guarded externs.
+     * #ifndef guards handle platforms that redefine these as macros.
+     * In pipeline mode (cc -E | phc | cc), the guards are safe:
+     * if the function is not a macro, the extern is emitted as before;
+     * if it is a macro, the extern is skipped.
+     *
+     * snprintf is NOT declared here — _FORTIFY_SOURCE uses inline
+     * wrappers (__builtin___snprintf_chk), not preprocessor macros,
+     * so #ifndef snprintf doesn't help. Consumers must include stdio.h. */
     for (int i = 0; i < prog->descr_count; i++) {
         if (prog->descrs[i].variant_count >= 0) {
-            buf_append(&buf, "extern void abort(void);\n");
+            buf_append(&buf, "#ifndef abort\nextern void abort(void);\n#endif\n");
             buf_append(&buf, "#define phc_free(pp) do { free(*(pp)); *(pp) = ((void*)0); } while(0)\n");
             break;
         }
     }
-    /* Declare strcmp() for enum from_string functions */
     if (prog->enum_count > 0) {
-        buf_append(&buf, "extern int strcmp(const char *, const char *);\n");
-    }
-    /* Declare snprintf() for flags to_string functions */
-    if (prog->flags_count > 0) {
-        buf_append(&buf, "extern int snprintf(char *, unsigned long, const char *, ...);\n");
+        buf_append(&buf, "#ifndef strcmp\nextern int strcmp(const char *, const char *);\n#endif\n");
     }
 
     for (int i = 0; i < prog->chunk_count; i++) {
@@ -737,19 +743,19 @@ char *codegen_header(const Program *prog, const char *guard_name) {
     buf_printf(&buf, "#ifndef %s\n", guard_name);
     buf_printf(&buf, "#define %s\n\n", guard_name);
 
-    /* Preamble: extern declarations needed by generated code */
+    /* Preamble: standard includes needed by generated code.
+     * Headers must be self-contained — use #include, not bare externs.
+     * (Normal output uses bare externs to avoid double-expansion in
+     * post-preprocessor pipeline; headers don't have that constraint.) */
     int has_descr = 0;
     for (int i = 0; i < prog->descr_count; i++) {
         if (prog->descrs[i].variant_count >= 0) { has_descr = 1; break; }
     }
     if (has_descr) {
-        buf_append(&buf, "extern void abort(void);\n");
+        buf_append(&buf, "#include <stdlib.h>  /* abort for safe accessors */\n");
     }
     if (prog->enum_count > 0) {
-        buf_append(&buf, "extern int strcmp(const char *, const char *);\n");
-    }
-    if (prog->flags_count > 0) {
-        buf_append(&buf, "extern int snprintf(char *, unsigned long, const char *, ...);\n");
+        buf_append(&buf, "#include <string.h>  /* strcmp for enum from_string */\n");
     }
     buf_append(&buf, "\n");
 

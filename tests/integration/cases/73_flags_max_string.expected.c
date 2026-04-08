@@ -1,4 +1,3 @@
-extern int snprintf(char *, unsigned long, const char *, ...);
 #include <stdio.h>
 
 typedef unsigned int Opts;
@@ -22,12 +21,25 @@ static inline Opts Opts_clear(Opts flags, Opts flag) {
 }
 
 static inline const char *Opts_to_string(Opts p, char *buf, unsigned long len) {
-    buf[0] = '\0';
-    unsigned long pos = 0;
-    if (p & Opts_Alpha) { pos += snprintf(buf + pos, len - pos, "%sAlpha", pos ? "|" : ""); }
-    if (p & Opts_Beta) { pos += snprintf(buf + pos, len - pos, "%sBeta", pos ? "|" : ""); }
-    if (p & Opts_Gamma) { pos += snprintf(buf + pos, len - pos, "%sGamma", pos ? "|" : ""); }
-    if (pos == 0) { snprintf(buf, len, "(none)"); }
+    if (len == 0) return buf;
+    char *pos = buf;
+    char *end = buf + len - 1;
+    if (p & Opts_Alpha) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Alpha"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Opts_Beta) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Beta"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Opts_Gamma) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Gamma"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (pos == buf) {
+        const char *s = "(none)"; while (*s && pos < end) *pos++ = *s++;
+    }
+    *pos = '\0';
     return buf;
 }
 #line 8

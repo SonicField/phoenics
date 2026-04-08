@@ -1,4 +1,3 @@
-extern int snprintf(char *, unsigned long, const char *, ...);
 #include <stdio.h>
 
 typedef unsigned int Permissions;
@@ -22,12 +21,25 @@ static inline Permissions Permissions_clear(Permissions flags, Permissions flag)
 }
 
 static inline const char *Permissions_to_string(Permissions p, char *buf, unsigned long len) {
-    buf[0] = '\0';
-    unsigned long pos = 0;
-    if (p & Permissions_Read) { pos += snprintf(buf + pos, len - pos, "%sRead", pos ? "|" : ""); }
-    if (p & Permissions_Write) { pos += snprintf(buf + pos, len - pos, "%sWrite", pos ? "|" : ""); }
-    if (p & Permissions_Execute) { pos += snprintf(buf + pos, len - pos, "%sExecute", pos ? "|" : ""); }
-    if (pos == 0) { snprintf(buf, len, "(none)"); }
+    if (len == 0) return buf;
+    char *pos = buf;
+    char *end = buf + len - 1;
+    if (p & Permissions_Read) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Read"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Permissions_Write) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Write"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Permissions_Execute) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Execute"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (pos == buf) {
+        const char *s = "(none)"; while (*s && pos < end) *pos++ = *s++;
+    }
+    *pos = '\0';
     return buf;
 }
 #line 8

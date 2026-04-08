@@ -1,4 +1,6 @@
+#ifndef strcmp
 extern int strcmp(const char *, const char *);
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 

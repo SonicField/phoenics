@@ -1,4 +1,3 @@
-extern int snprintf(char *, unsigned long, const char *, ...);
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -23,12 +22,25 @@ static inline Options Options_clear(Options flags, Options flag) {
 }
 
 static inline const char *Options_to_string(Options p, char *buf, unsigned long len) {
-    buf[0] = '\0';
-    unsigned long pos = 0;
-    if (p & Options_Fast) { pos += snprintf(buf + pos, len - pos, "%sFast", pos ? "|" : ""); }
-    if (p & Options_Safe) { pos += snprintf(buf + pos, len - pos, "%sSafe", pos ? "|" : ""); }
-    if (p & Options_Quiet) { pos += snprintf(buf + pos, len - pos, "%sQuiet", pos ? "|" : ""); }
-    if (pos == 0) { snprintf(buf, len, "(none)"); }
+    if (len == 0) return buf;
+    char *pos = buf;
+    char *end = buf + len - 1;
+    if (p & Options_Fast) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Fast"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Options_Safe) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Safe"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (p & Options_Quiet) {
+        if (pos != buf && pos < end) *pos++ = '|';
+        { const char *s = "Quiet"; while (*s && pos < end) *pos++ = *s++; }
+    }
+    if (pos == buf) {
+        const char *s = "(none)"; while (*s && pos < end) *pos++ = *s++;
+    }
+    *pos = '\0';
     return buf;
 }
 #line 9
