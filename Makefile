@@ -91,7 +91,8 @@ test-asan: clean
 
 # Valgrind: catches uninitialised reads, leaks, and subtle memory errors
 # Stronger than ASan for uninitialised value tracking
-test-valgrind: $(BUILDDIR)/phc test-unit
+# Depends on clean — valgrind and ASan binaries are incompatible
+test-valgrind: clean $(BUILDDIR)/phc test-unit
 	@echo "=== Valgrind Tests ==="
 	@fail=0; \
 	for t in $(BUILDDIR)/test_*; do \
