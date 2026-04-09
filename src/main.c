@@ -87,17 +87,31 @@ static int emit_type_manifest(const char *path, const Program *prog) {
         sprintf(header_path, "%s.h", path);
     }
 
-    /* Build include guard name from header filename */
+    /* Build include guard name from header filename.
+     * Dash maps to double-underscore to avoid collisions:
+     *   foo-bar.phc.h -> PHC_FOO__BAR_PHC_H
+     *   foo_bar.phc.h -> PHC_FOO_BAR_PHC_H */
     const char *base = header_path;
     for (const char *p = header_path; *p; p++) {
         if (*p == '/') base = p + 1;
     }
     char guard[256];
-    snprintf(guard, sizeof(guard), "PHC_%s", base);
-    for (char *g = guard; *g; g++) {
-        if (*g == '.' || *g == '-' || *g == ' ') *g = '_';
-        else if (*g >= 'a' && *g <= 'z') *g = (char)(*g - 'a' + 'A');
+    char *g = guard;
+    char *gend = guard + sizeof(guard) - 1;
+    const char *prefix = "PHC_";
+    while (*prefix && g < gend) *g++ = *prefix++;
+    for (const char *s = base; *s && g < gend; s++) {
+        if (*s == '-') {
+            if (g + 1 < gend) { *g++ = '_'; *g++ = '_'; }
+        } else if (*s == '.' || *s == ' ') {
+            *g++ = '_';
+        } else if (*s >= 'a' && *s <= 'z') {
+            *g++ = (char)(*s - 'a' + 'A');
+        } else {
+            *g++ = *s;
+        }
     }
+    *g = '\0';
 
     char *header = codegen_header(prog, guard);
     if (header) {

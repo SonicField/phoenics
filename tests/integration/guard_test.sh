@@ -166,10 +166,10 @@ fi
 # Section 3: Guard name collision in --emit-types
 # ============================================================
 
-# Test 4: dash vs underscore produce same guard token (known collision)
-# Expected: guards collide. PASS confirms the known limitation is still present.
-# When the collision is fixed, this test will fail — signalling the fix landed.
-run_test "guard_collision_dash_vs_underscore_detected"
+# Test 4: dash vs underscore produce distinct guard tokens
+# Dash maps to double-underscore: foo-bar -> PHC_FOO__BAR_PHC_H
+# Underscore stays single:        foo_bar -> PHC_FOO_BAR_PHC_H
+run_test "guard_names_distinct_dash_vs_underscore"
 cat > "$TESTDIR/foo-bar.phc" <<'EOF'
 phc_descr Alpha {
     A1 { int x; }
@@ -186,25 +186,21 @@ EOF
 if [ -f "$TESTDIR/foo-bar.phc.h" ] && [ -f "$TESTDIR/foo_bar.phc.h" ]; then
     guard1=$(grep '#ifndef PHC_' "$TESTDIR/foo-bar.phc.h" | head -1)
     guard2=$(grep '#ifndef PHC_' "$TESTDIR/foo_bar.phc.h" | head -1)
-    if [ "$guard1" = "$guard2" ]; then
-        # Guards collide as expected (known bug: dash normalizes to underscore)
+    if [ "$guard1" != "$guard2" ]; then
         pass
     else
-        fail "guards no longer collide — update test if collision was fixed"
+        fail "guards still collide: $guard1"
     fi
 else
     fail "headers not generated"
 fi
 
-# Test 5: collision causes silent type loss when both headers included
-# Expected: compilation fails because second header is empty (guard already defined).
-# PASS confirms the collision has real consequences.
-run_test "guard_collision_causes_silent_type_loss"
+# Test 5: both headers can be included in one file (no collision)
+run_test "multi_header_inclusion_dash_vs_underscore"
 if [ -f "$TESTDIR/foo-bar.phc.h" ] && [ -f "$TESTDIR/foo_bar.phc.h" ]; then
     cat > "$TESTDIR/collision_test.c" <<CFILE
 #include "foo-bar.phc.h"
 #include "foo_bar.phc.h"
-/* If guards collide, Beta is undefined here */
 int main(void) {
     Alpha a = Alpha_mk_A1(1);
     Beta b = Beta_mk_B1(2);
@@ -213,10 +209,9 @@ int main(void) {
 }
 CFILE
     if $CC $CFLAGS -I"$TESTDIR" -o "$TESTDIR/collision_test" "$TESTDIR/collision_test.c" 2>/dev/null; then
-        fail "both types resolved — collision may be fixed, update test"
-    else
-        # Expected: Beta undefined because second header was empty
         pass
+    else
+        fail "multi-header inclusion failed"
     fi
 else
     fail "headers not generated"
