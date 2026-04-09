@@ -218,6 +218,106 @@ else
 fi
 
 # ============================================================
+# Section 4: Non-identifier bytes — hex-encoding (security + i18n)
+# ============================================================
+
+# Test 6: Unicode filename — C11 universal character names in guard
+run_test "guard_uses_ucn_for_unicode_filename"
+# 测试 is U+6D4B U+8BD5
+cat > "$TESTDIR/测试.phc" <<'EOF'
+phc_descr Gamma {
+    G1 { int z; }
+};
+EOF
+"$PHC" --emit-types="$TESTDIR/测试.phc-types" < "$TESTDIR/测试.phc" > "$TESTDIR/测试.c" 2>/dev/null
+if [ -f "$TESTDIR/测试.phc.h" ]; then
+    guard=$(grep '#ifndef PHC_' "$TESTDIR/测试.phc.h" | head -1 | awk '{print $2}')
+    # Unicode codepoints become \uXXXX universal character names
+    if echo "$guard" | grep -q '\\u6D4B\\u8BD5'; then
+        # Verify it compiles with C11 (UCN support required)
+        cat > "$TESTDIR/unicode_test.c" <<CFILE
+#include "测试.phc.h"
+int main(void) {
+    Gamma g = Gamma_mk_G1(1);
+    (void)g;
+    return 0;
+}
+CFILE
+        if $CC $CFLAGS -I"$TESTDIR" -o "$TESTDIR/unicode_test" "$TESTDIR/unicode_test.c" 2>/dev/null; then
+            pass
+        else
+            fail "UCN guard but compilation failed"
+        fi
+    else
+        fail "guard missing UCN \\u6D4B\\u8BD5: $guard"
+    fi
+else
+    fail "header not generated"
+fi
+
+# Test 7: special chars (semicolon, angle bracket) are hex-encoded
+run_test "guard_hex_encodes_special_chars"
+# Create a file with semicolon in the name — tests preprocessor injection safety
+fname="a;b.phc"
+cat > "$TESTDIR/$fname" <<'EOF'
+phc_descr Delta {
+    D1 { int w; }
+};
+EOF
+"$PHC" --emit-types="$TESTDIR/${fname}-types" < "$TESTDIR/$fname" > "$TESTDIR/${fname%.phc}.c" 2>/dev/null
+if [ -f "$TESTDIR/$fname.h" ]; then
+    guard=$(grep '#ifndef PHC_' "$TESTDIR/$fname.h" | head -1 | awk '{print $2}')
+    # Semicolon 0x3B → X_3B_
+    if echo "$guard" | grep -q 'X_3B_'; then
+        # Verify it compiles
+        cat > "$TESTDIR/special_test.c" <<CFILE
+#include "a;b.phc.h"
+int main(void) {
+    Delta d = Delta_mk_D1(1);
+    (void)d;
+    return 0;
+}
+CFILE
+        if $CC $CFLAGS -I"$TESTDIR" -o "$TESTDIR/special_test" "$TESTDIR/special_test.c" 2>/dev/null; then
+            pass
+        else
+            fail "valid guard but compilation failed"
+        fi
+    else
+        fail "semicolon not hex-encoded: $guard"
+    fi
+else
+    fail "header not generated"
+fi
+
+# Test 8: space in filename is hex-encoded (not collapsed to underscore)
+run_test "guard_hex_encodes_space_distinct_from_dot"
+cat > "$TESTDIR/a b.phc" <<'EOF'
+phc_descr Epsilon {
+    E1 { int v; }
+};
+EOF
+cat > "$TESTDIR/a.b.phc" <<'EOF'
+phc_descr Zeta {
+    Z1 { int u; }
+};
+EOF
+"$PHC" --emit-types="$TESTDIR/a b.phc-types" < "$TESTDIR/a b.phc" > "$TESTDIR/a b.c" 2>/dev/null
+"$PHC" --emit-types="$TESTDIR/a.b.phc-types" < "$TESTDIR/a.b.phc" > "$TESTDIR/a.b.c" 2>/dev/null
+if [ -f "$TESTDIR/a b.phc.h" ] && [ -f "$TESTDIR/a.b.phc.h" ]; then
+    guard_space=$(grep '#ifndef PHC_' "$TESTDIR/a b.phc.h" | head -1 | awk '{print $2}')
+    guard_dot=$(grep '#ifndef PHC_' "$TESTDIR/a.b.phc.h" | head -1 | awk '{print $2}')
+    if [ "$guard_space" != "$guard_dot" ]; then
+        # Space 0x20 → X_20_, dot → _. Distinct.
+        pass
+    else
+        fail "space and dot produced same guard: $guard_space"
+    fi
+else
+    fail "headers not generated"
+fi
+
+# ============================================================
 # Summary
 # ============================================================
 echo ""

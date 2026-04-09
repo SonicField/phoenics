@@ -88,27 +88,93 @@ static int emit_type_manifest(const char *path, const Program *prog) {
     }
 
     /* Build include guard name from header filename.
+     * Safe chars [A-Za-z0-9_] pass through (lowercase uppercased).
      * Dash maps to double-underscore to avoid collisions:
      *   foo-bar.phc.h -> PHC_FOO__BAR_PHC_H
-     *   foo_bar.phc.h -> PHC_FOO_BAR_PHC_H */
+     *   foo_bar.phc.h -> PHC_FOO_BAR_PHC_H
+     * Dot maps to single underscore.
+     * Non-ASCII (UTF-8) → C11 universal character names (\uXXXX).
+     * Control chars and special chars → hex-encoded as X_XX_. */
     const char *base = header_path;
     for (const char *p = header_path; *p; p++) {
         if (*p == '/') base = p + 1;
     }
-    char guard[256];
+    char guard[512];
     char *g = guard;
     char *gend = guard + sizeof(guard) - 1;
+    static const char hex[] = "0123456789ABCDEF";
     const char *prefix = "PHC_";
     while (*prefix && g < gend) *g++ = *prefix++;
     for (const char *s = base; *s && g < gend; s++) {
-        if (*s == '-') {
+        unsigned char ch = (unsigned char)*s;
+        if (ch == '-') {
             if (g + 1 < gend) { *g++ = '_'; *g++ = '_'; }
-        } else if (*s == '.' || *s == ' ') {
+        } else if (ch == '.') {
             *g++ = '_';
-        } else if (*s >= 'a' && *s <= 'z') {
-            *g++ = (char)(*s - 'a' + 'A');
+        } else if (ch >= 'a' && ch <= 'z') {
+            *g++ = (char)(ch - 'a' + 'A');
+        } else if (ch == '_' || (ch >= 'A' && ch <= 'Z') ||
+                   (ch >= '0' && ch <= '9')) {
+            *g++ = (char)ch;
+        } else if (ch >= 0x80) {
+            /* UTF-8 multi-byte → C11 universal character name */
+            unsigned long cp = 0;
+            int trail = 0;
+            if ((ch & 0xE0) == 0xC0)      { cp = ch & 0x1F; trail = 1; }
+            else if ((ch & 0xF0) == 0xE0)  { cp = ch & 0x0F; trail = 2; }
+            else if ((ch & 0xF8) == 0xF0)  { cp = ch & 0x07; trail = 3; }
+            else {
+                if (g + 4 < gend) {
+                    *g++ = 'X'; *g++ = '_';
+                    *g++ = hex[ch >> 4]; *g++ = hex[ch & 0x0F];
+                    *g++ = '_';
+                }
+                continue;
+            }
+            int valid = 1;
+            const char *start = s;
+            for (int i = 0; i < trail; i++) {
+                if (!s[1] || ((unsigned char)s[1] & 0xC0) != 0x80) {
+                    valid = 0; break;
+                }
+                s++;
+                cp = (cp << 6) | ((unsigned char)*s & 0x3F);
+            }
+            if (!valid) {
+                s = start; /* reset — hex-encode the lead byte only */
+                if (g + 4 < gend) {
+                    *g++ = 'X'; *g++ = '_';
+                    *g++ = hex[ch >> 4]; *g++ = hex[ch & 0x0F];
+                    *g++ = '_';
+                }
+            } else if (cp <= 0xFFFF) {
+                if (g + 5 < gend) {
+                    *g++ = '\\'; *g++ = 'u';
+                    *g++ = hex[(cp >> 12) & 0x0F];
+                    *g++ = hex[(cp >> 8) & 0x0F];
+                    *g++ = hex[(cp >> 4) & 0x0F];
+                    *g++ = hex[cp & 0x0F];
+                }
+            } else {
+                if (g + 9 < gend) {
+                    *g++ = '\\'; *g++ = 'U';
+                    *g++ = hex[(cp >> 28) & 0x0F];
+                    *g++ = hex[(cp >> 24) & 0x0F];
+                    *g++ = hex[(cp >> 20) & 0x0F];
+                    *g++ = hex[(cp >> 16) & 0x0F];
+                    *g++ = hex[(cp >> 12) & 0x0F];
+                    *g++ = hex[(cp >> 8) & 0x0F];
+                    *g++ = hex[(cp >> 4) & 0x0F];
+                    *g++ = hex[cp & 0x0F];
+                }
+            }
         } else {
-            *g++ = *s;
+            /* Control chars and special chars → hex-encode as X_XX_ */
+            if (g + 4 < gend) {
+                *g++ = 'X'; *g++ = '_';
+                *g++ = hex[ch >> 4]; *g++ = hex[ch & 0x0F];
+                *g++ = '_';
+            }
         }
     }
     *g = '\0';
