@@ -529,6 +529,116 @@ Compiler errors reference the original `.phc` source, not the generated output.
 
 ---
 
+## `phc_require` / `phc_check` / `phc_invariant` — Assertions
+
+Assertions are executable hypotheses. Each one states "this must be true" and attempts to falsify it at runtime. A triggered assertion is proof of a bug — not a hint, not a warning, proof.
+
+Three levels, distinguished by trust:
+
+| Level | Keyword | Stripped? | Purpose |
+|-------|---------|-----------|---------|
+| Require | `phc_require` | Never | Untrusted boundaries — caller input, external return values, IPC results |
+| Check | `phc_check` | `--strip-check` | Own code correctness — postconditions, output validation |
+| Invariant | `phc_invariant` | `--strip-invariant` | Structural properties — sorted order, ref count balance, tree depth |
+
+The distinction is trust. `phc_require` guards data you do not control — it stays in production because untrusted data can be wrong at any time. `phc_check` and `phc_invariant` guard your own code — they are falsifiers you deploy during development and withdraw when confidence is earned.
+
+### Syntax
+
+```
+phc_require(<expr>, "<message>");
+phc_check(<expr>, "<message>");
+phc_invariant(<expr>, "<message>");
+```
+
+The expression is any C expression that evaluates to true (nonzero) or false (zero). The message is a string literal describing what was expected.
+
+### Example
+
+```c
+int Cmd_SetColor(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *const objv[]) {
+    phc_require(objc == 3, "set_color requires exactly 2 args");
+    phc_require(interp != NULL, "interpreter must not be null");
+
+    Color c = parse_color(objv[1]);
+    phc_check(c.tag != Color__COUNT, "parse_color returned invalid tag");
+
+    apply_color(canvas, c);
+
+    phc_invariant(googled_color_count >= 0, "color count went negative");
+    return TCL_OK;
+}
+```
+
+### Generated C
+
+Each assertion becomes an `if` guard that calls `abort()` on failure. The message is preserved as a C comment:
+
+```c
+if (!(objc == 3)) abort(); /* REQUIRE: set_color requires exactly 2 args */
+if (!(interp != NULL)) abort(); /* REQUIRE: interpreter must not be null */
+if (!(c.tag != Color__COUNT)) abort(); /* CHECK: parse_color returned invalid tag */
+if (!(color_count >= 0)) abort(); /* INVARIANT: color count went negative */
+```
+
+No `fprintf`, no `stdio.h` dependency. The message is visible in the source and in debuggers via the comment. The abort location is identified by the stack trace or core dump.
+
+### Compile-Time Stripping
+
+Stripping physically removes assertion code from the output. Not dead code — absent code. Zero overhead.
+
+```bash
+# Test build: all assertions active
+phc < input.phc > output.c
+
+# Debug build: invariants stripped
+phc --strip-invariant < input.phc > output.c
+
+# Release build: checks and invariants stripped, requires stay
+phc --strip-check --strip-invariant < input.phc > output.c
+```
+
+Build profiles:
+
+| Profile | `phc_require` | `phc_check` | `phc_invariant` |
+|---------|--------------|-------------|-----------------|
+| Test | active | active | active |
+| Debug | active | active | **stripped** |
+| Release | active | **stripped** | **stripped** |
+
+`phc_require` has no strip flag. It cannot be disabled. If you do not want a require, do not write one.
+
+### Stripped Comments
+
+When an assertion is stripped, phc emits a comment marking the omission:
+
+```c
+/* phc_check stripped: hypothesis accepted without verification */
+/* phc_invariant stripped: hypothesis accepted without verification */
+```
+
+This makes stripping visible. A reader of the generated C knows that a falsification was defined here and deliberately removed. The alternative — no trace — creates invisible assumptions.
+
+### Naming
+
+| What | Pattern | Example |
+|------|---------|---------|
+| Require | `phc_require(expr, msg)` | `phc_require(n > 0, "n must be positive")` |
+| Check | `phc_check(expr, msg)` | `phc_check(result != NULL, "alloc failed")` |
+| Invariant | `phc_invariant(expr, msg)` | `phc_invariant(sorted(list), "list unsorted")` |
+
+### Epistemology
+
+You cannot prove code correct. You can prove it wrong. Each assertion is a hypothesis test: "I claim this state is correct. Here is the test that would prove me wrong."
+
+- `phc_require`: permanent falsifier. Active at all times because the hypothesis "this external data is valid" must be tested on every call.
+- `phc_check`: deployable falsifier. Active during development to test "my code produces correct output." Withdrawn in production when confidence is earned — not because the hypothesis is proven, but because the cost of testing exceeds the expected value.
+- `phc_invariant`: expensive falsifier. Active during testing to hunt for structural bugs. Withdrawn earliest because invariant checks are often O(n) or worse.
+
+A stripped assertion is not a removed assertion. It is an accepted hypothesis — accepted without verification, at the developer's risk.
+
+---
+
 ## Complex Field Types
 
 ### Function pointers
