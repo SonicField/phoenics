@@ -30,7 +30,7 @@ $(BUILDDIR)/phc: $(OBJS) | $(BUILDDIR)
 $(BUILDDIR)/test_%: $(TESTDIR)/unit/%.c $(LIB_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR) $< $(LIB_OBJS) -o $@
 
-test: test-unit test-integration test-fidelity test-selfhost test-pipeline test-multifile test-line
+test: test-unit test-integration test-fidelity test-selfhost test-pipeline test-multifile test-line test-headergen test-stdlib-extern
 
 test-unit: $(UNIT_BINS)
 	@echo "=== Unit Tests ==="
@@ -60,6 +60,16 @@ test-line: $(BUILDDIR)/phc
 test-multifile: $(BUILDDIR)/phc
 	@echo "=== Multi-File Integration Tests ==="
 	@$(TESTDIR)/integration/multifile_test.sh $(BUILDDIR)/phc
+
+# Header generation tests (V12 .phc.h headers)
+test-headergen: $(BUILDDIR)/phc
+	@echo "=== Header Generation Tests ==="
+	@$(TESTDIR)/integration/header_gen_test.sh $(BUILDDIR)/phc
+
+# Standard library extern portability tests
+test-stdlib-extern: $(BUILDDIR)/phc
+	@echo "=== Standard Library Extern Tests ==="
+	@$(TESTDIR)/integration/stdlib_extern_test.sh $(BUILDDIR)/phc
 
 # Self-hosting: phc must pass through its own source unchanged
 test-selfhost: $(BUILDDIR)/phc
