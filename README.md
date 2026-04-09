@@ -158,6 +158,7 @@ Multiple defers stack in LIFO order. Works with `phc_match` — cleanup fires on
 - [Phoenics Language Reference](docs/phoenics-reference.md) — Full specification
 - [Architecture](docs/architecture.md) — Design decisions and internals
 - [Design Notes](docs/design-notes.md) — Development history
+- [Known Gotchas](docs/known-gotchas.md) — Platform-specific issues and integration pitfalls
 
 ## Known Limitations
 
