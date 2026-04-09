@@ -120,19 +120,17 @@ static int emit_type_manifest(const char *path, const Program *prog) {
             /* UTF-8 multi-byte → C11 universal character name */
             unsigned long cp = 0;
             int trail = 0;
+            static const unsigned long min_cp[] = {0x80, 0x800, 0x10000};
             if ((ch & 0xE0) == 0xC0)      { cp = ch & 0x1F; trail = 1; }
             else if ((ch & 0xF0) == 0xE0)  { cp = ch & 0x0F; trail = 2; }
             else if ((ch & 0xF8) == 0xF0)  { cp = ch & 0x07; trail = 3; }
             else {
-                if (g + 4 < gend) {
-                    *g++ = 'X'; *g++ = '_';
-                    *g++ = hex[ch >> 4]; *g++ = hex[ch & 0x0F];
-                    *g++ = '_';
-                }
-                continue;
+                fprintf(stderr,
+                    "phc: error: filename not representable in C11"
+                    " — invalid UTF-8. Aborting.\n");
+                exit(1);
             }
             int valid = 1;
-            const char *start = s;
             for (int i = 0; i < trail; i++) {
                 if (!s[1] || ((unsigned char)s[1] & 0xC0) != 0x80) {
                     valid = 0; break;
@@ -141,13 +139,32 @@ static int emit_type_manifest(const char *path, const Program *prog) {
                 cp = (cp << 6) | ((unsigned char)*s & 0x3F);
             }
             if (!valid) {
-                s = start; /* reset — hex-encode the lead byte only */
-                if (g + 4 < gend) {
-                    *g++ = 'X'; *g++ = '_';
-                    *g++ = hex[ch >> 4]; *g++ = hex[ch & 0x0F];
-                    *g++ = '_';
-                }
-            } else if (cp <= 0xFFFF) {
+                fprintf(stderr,
+                    "phc: error: filename not representable in C11"
+                    " — truncated UTF-8. Aborting.\n");
+                exit(1);
+            }
+            /* Reject surrogates (broken pairs from Windows NTFS),
+             * overlong encodings, and codepoints beyond Unicode. */
+            if (cp >= 0xD800 && cp <= 0xDFFF) {
+                fprintf(stderr,
+                    "phc: error: filename not representable in C11"
+                    " — surrogate codepoint. Aborting.\n");
+                exit(1);
+            }
+            if (cp < min_cp[trail - 1]) {
+                fprintf(stderr,
+                    "phc: error: filename not representable in C11"
+                    " — overlong encoding. Aborting.\n");
+                exit(1);
+            }
+            if (cp > 0x10FFFF) {
+                fprintf(stderr,
+                    "phc: error: filename not representable in C11"
+                    " — codepoint beyond Unicode. Aborting.\n");
+                exit(1);
+            }
+            if (cp <= 0xFFFF) {
                 if (g + 5 < gend) {
                     *g++ = '\\'; *g++ = 'u';
                     *g++ = hex[(cp >> 12) & 0x0F];

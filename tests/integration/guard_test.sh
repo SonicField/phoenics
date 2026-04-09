@@ -317,6 +317,40 @@ else
     fail "headers not generated"
 fi
 
+# Test 9: surrogate codepoint in filename — phc must abort
+run_test "guard_rejects_surrogate_codepoint"
+# Lone high surrogate U+D800 = UTF-8 bytes ED A0 80
+surrogate_name=$(printf '\xed\xa0\x80.phc')
+cat > "$TESTDIR/$surrogate_name" <<'EOF'
+phc_descr Bad { B1 { int x; } };
+EOF
+if "$PHC" --emit-types="$TESTDIR/${surrogate_name}-types" < "$TESTDIR/$surrogate_name" > "$TESTDIR/surrogate.c" 2>"$TESTDIR/surrogate.err"; then
+    fail "should have aborted but exited 0"
+else
+    if grep -qi 'not representable in C11' "$TESTDIR/surrogate.err"; then
+        pass
+    else
+        fail "exited non-zero but wrong diagnostic: $(cat "$TESTDIR/surrogate.err")"
+    fi
+fi
+
+# Test 10: overlong UTF-8 encoding — phc must abort
+run_test "guard_rejects_overlong_utf8"
+# Overlong encoding of '/' (U+002F) as 2-byte C0 AF
+overlong_name=$(printf 'x\xc0\xafy.phc')
+cat > "$TESTDIR/$overlong_name" <<'EOF'
+phc_descr Bad2 { B2 { int x; } };
+EOF
+if "$PHC" --emit-types="$TESTDIR/${overlong_name}-types" < "$TESTDIR/$overlong_name" > "$TESTDIR/overlong.c" 2>"$TESTDIR/overlong.err"; then
+    fail "should have aborted but exited 0"
+else
+    if grep -qi 'not representable in C11' "$TESTDIR/overlong.err"; then
+        pass
+    else
+        fail "exited non-zero but wrong diagnostic: $(cat "$TESTDIR/overlong.err")"
+    fi
+fi
+
 # ============================================================
 # Summary
 # ============================================================
