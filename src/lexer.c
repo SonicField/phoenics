@@ -203,7 +203,10 @@ static Token lexer_next_scan(Lexer *lex) {
                 check_keyword(lex, id_start, id_len, "phc_flags", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_match", 9) ||
                 check_keyword(lex, id_start, id_len, "phc_defer", 9) ||
-                check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16)) {
+                check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16) ||
+                check_keyword(lex, id_start, id_len, "phc_require", 11) ||
+                check_keyword(lex, id_start, id_len, "phc_check", 9) ||
+                check_keyword(lex, id_start, id_len, "phc_invariant", 13)) {
                 /* Keyword found! Emit TOK_OTHER for text before it, if any */
                 if (id_start > start) {
                     return make_token(TOK_OTHER, lex->src + start,
@@ -219,7 +222,19 @@ static Token lexer_next_scan(Lexer *lex) {
                 lex->brace_depth = 0;
                 lex->depth_zero_seen = 0;
 
-                if (id_len == 16 && check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16)) {
+                if (id_len == 11 && check_keyword(lex, id_start, id_len, "phc_require", 11)) {
+                    lex->mode = LEXER_SCAN;
+                    return make_token(TOK_PHC_REQUIRE, lex->src + id_start,
+                                      id_len, id_start, kline, kcol, korig);
+                } else if (id_len == 9 && check_keyword(lex, id_start, id_len, "phc_check", 9)) {
+                    lex->mode = LEXER_SCAN;
+                    return make_token(TOK_PHC_CHECK, lex->src + id_start,
+                                      id_len, id_start, kline, kcol, korig);
+                } else if (id_len == 13 && check_keyword(lex, id_start, id_len, "phc_invariant", 13)) {
+                    lex->mode = LEXER_SCAN;
+                    return make_token(TOK_PHC_INVARIANT, lex->src + id_start,
+                                      id_len, id_start, kline, kcol, korig);
+                } else if (id_len == 16 && check_keyword(lex, id_start, id_len, "phc_defer_cancel", 16)) {
                     /* phc_defer_cancel — not a struct-mode keyword */
                     lex->mode = LEXER_SCAN;
                     return make_token(TOK_PHC_DEFER_CANCEL, lex->src + id_start,

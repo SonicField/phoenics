@@ -309,10 +309,16 @@ int main(int argc, char **argv) {
     const char **manifest_paths = NULL;
     int manifest_count = 0;
     int manifest_cap = 0;
+    int strip_check = 0;
+    int strip_invariant = 0;
 
     /* Parse CLI arguments */
     for (int i = 1; i < argc; i++) {
-        if (strncmp(argv[i], "--emit-types=", 13) == 0) {
+        if (strcmp(argv[i], "--strip-check") == 0) {
+            strip_check = 1;
+        } else if (strcmp(argv[i], "--strip-invariant") == 0) {
+            strip_invariant = 1;
+        } else if (strncmp(argv[i], "--emit-types=", 13) == 0) {
             emit_types_path = argv[i] + 13;
         } else if (strncmp(argv[i], "--type-manifest=", 16) == 0) {
             if (manifest_count >= manifest_cap) {
@@ -376,7 +382,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    char *output = codegen(&result.program, external_types, external_count);
+    char *output = codegen(&result.program, external_types, external_count,
+                           strip_check, strip_invariant);
     /* Free semantic result BEFORE external types: analyse() copies name
      * pointers (not strings) from external_types into its type table,
      * and semantic_result_free() frees the pointer arrays but not the

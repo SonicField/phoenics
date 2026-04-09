@@ -397,14 +397,16 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
                          const DescrType *ext_types, int ext_count,
                          const EnumDecl *enums, int enum_count,
                          int active_defer_count,
-                         const char **defer_bodies, int defer_body_count);
+                         const char **defer_bodies, int defer_body_count,
+                         int strip_check, int strip_invariant);
 
 static void emit_match_descr(Buffer *buf, const MatchDescr *m,
                               const DescrDecl *descrs, int descr_count,
                               const DescrType *ext_types, int ext_count,
                               const EnumDecl *enums, int enum_count,
                               int active_defer_count,
-                              const char **defer_bodies, int defer_body_count) {
+                              const char **defer_bodies, int defer_body_count,
+                              int strip_check, int strip_invariant) {
     int match_is_enum = is_enum_type(m->type_name, enums, enum_count,
                                      ext_types, ext_count);
     buf_append(buf, "switch (");
@@ -428,7 +430,8 @@ static void emit_match_descr(Buffer *buf, const MatchDescr *m,
             emit_chunks(buf, (const Chunk *)mc->body_chunks, mc->body_chunk_count,
                         mc->body_text, descrs, descr_count,
                         ext_types, ext_count, enums, enum_count,
-                        active_defer_count, defer_bodies, defer_body_count);
+                        active_defer_count, defer_bodies, defer_body_count,
+                        strip_check, strip_invariant);
             if (mc->binding_count > 0)
                 buf_append(buf, " }\n");
             else
@@ -458,7 +461,8 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
                          const DescrType *ext_types, int ext_count,
                          const EnumDecl *enums, int enum_count,
                          int active_defer_count,
-                         const char **defer_bodies, int defer_body_count) {
+                         const char **defer_bodies, int defer_body_count,
+                         int strip_check, int strip_invariant) {
     for (int i = 0; i < chunk_count; i++) {
         const Chunk *c = &chunks[i];
         switch (c->type) {
@@ -481,7 +485,8 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
         case CHUNK_MATCH_DESCR:
             emit_match_descr(buf, &c->match, descrs, descr_count,
                             ext_types, ext_count, enums, enum_count,
-                            active_defer_count, defer_bodies, defer_body_count);
+                            active_defer_count, defer_bodies, defer_body_count,
+                            strip_check, strip_invariant);
             break;
         case CHUNK_ENUM:
         case CHUNK_FLAGS:
@@ -533,6 +538,24 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
         case CHUNK_FUNC_END:
             /* Not expected in case bodies */
             break;
+        case CHUNK_ASSERT: {
+            const AssertStmt *a = &c->assert_stmt;
+            int should_strip = 0;
+            if (a->level == ASSERT_CHECK && strip_check) should_strip = 1;
+            if (a->level == ASSERT_INVARIANT && strip_invariant) should_strip = 1;
+            if (!should_strip) {
+                const char *label = a->level == ASSERT_REQUIRE ? "REQUIRE" :
+                                    a->level == ASSERT_CHECK ? "CHECK" : "INVARIANT";
+                if (a->message)
+                    buf_printf(buf, "if (!(%s)) abort(); /* %s: %s */", a->expr, label, a->message);
+                else
+                    buf_printf(buf, "if (!(%s)) abort(); /* %s */", a->expr, label);
+            } else {
+                const char *kind = a->level == ASSERT_CHECK ? "phc_check" : "phc_invariant";
+                buf_printf(buf, "/* %s stripped: hypothesis accepted without verification */", kind);
+            }
+            break;
+        }
         }
     }
 }
@@ -540,7 +563,8 @@ static void emit_chunks(Buffer *buf, const Chunk *chunks, int chunk_count,
 /* --- Main codegen --- */
 
 char *codegen(const Program *prog,
-              const DescrType *external_types, int external_type_count) {
+              const DescrType *external_types, int external_type_count,
+              int strip_check, int strip_invariant) {
     Buffer buf;
     buf_init(&buf);
 
@@ -553,11 +577,32 @@ char *codegen(const Program *prog,
      * snprintf is NOT declared here — _FORTIFY_SOURCE uses inline
      * wrappers (__builtin___snprintf_chk), not preprocessor macros,
      * so #ifndef snprintf doesn't help. Consumers must include stdio.h. */
-    for (int i = 0; i < prog->descr_count; i++) {
-        if (prog->descrs[i].variant_count >= 0) {
+    {
+        int need_abort = 0;
+        for (int i = 0; i < prog->descr_count; i++) {
+            if (prog->descrs[i].variant_count >= 0) { need_abort = 1; break; }
+        }
+        /* Assertions also need abort */
+        if (!need_abort) {
+            for (int i = 0; i < prog->chunk_count; i++) {
+                if (prog->chunks[i].type == CHUNK_ASSERT) {
+                    AssertLevel lv = prog->chunks[i].assert_stmt.level;
+                    if (lv == ASSERT_REQUIRE ||
+                        (lv == ASSERT_CHECK && !strip_check) ||
+                        (lv == ASSERT_INVARIANT && !strip_invariant)) {
+                        need_abort = 1; break;
+                    }
+                }
+            }
+        }
+        if (need_abort) {
             buf_append(&buf, "#ifndef abort\nextern void abort(void);\n#endif\n");
-            buf_append(&buf, "#define phc_free(pp) do { free(*(pp)); *(pp) = ((void*)0); } while(0)\n");
-            break;
+        }
+        for (int i = 0; i < prog->descr_count; i++) {
+            if (prog->descrs[i].variant_count >= 0) {
+                buf_append(&buf, "#define phc_free(pp) do { free(*(pp)); *(pp) = ((void*)0); } while(0)\n");
+                break;
+            }
         }
     }
     if (prog->enum_count > 0) {
@@ -627,7 +672,8 @@ char *codegen(const Program *prog,
             emit_match_descr(&buf, &c->match, prog->descrs, prog->descr_count,
                             external_types, external_type_count,
                             prog->enums, prog->enum_count,
-                            active_defers, dbodies, dbody_count);
+                            active_defers, dbodies, dbody_count,
+                            strip_check, strip_invariant);
             free(dbodies);
             if (c->match.end_file)
                 buf_printf(&buf, "\n#line %d \"%s\"", c->match.end_line, c->match.end_file);
@@ -725,6 +771,30 @@ char *codegen(const Program *prog,
             }
             free(bodies);
             free(indices);
+            break;
+        }
+        case CHUNK_ASSERT: {
+            const AssertStmt *a = &c->assert_stmt;
+            int should_strip = 0;
+            if (a->level == ASSERT_CHECK && strip_check) should_strip = 1;
+            if (a->level == ASSERT_INVARIANT && strip_invariant) should_strip = 1;
+            /* phc_require is NEVER stripped */
+            if (!should_strip) {
+                const char *label = a->level == ASSERT_REQUIRE ? "REQUIRE" :
+                                    a->level == ASSERT_CHECK ? "CHECK" :
+                                    "INVARIANT";
+                if (a->message) {
+                    buf_printf(&buf, "if (!(%s)) abort(); /* %s: %s */",
+                               a->expr, label, a->message);
+                } else {
+                    buf_printf(&buf, "if (!(%s)) abort(); /* %s */",
+                               a->expr, label);
+                }
+            } else {
+                /* Stripped assertion — emit comment making stripping visible */
+                const char *kind = a->level == ASSERT_CHECK ? "phc_check" : "phc_invariant";
+                buf_printf(&buf, "/* %s stripped: hypothesis accepted without verification */", kind);
+            }
             break;
         }
         }

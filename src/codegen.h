@@ -10,7 +10,8 @@
  * Returns NULL on error (writes to stderr).
  */
 char *codegen(const Program *program,
-              const DescrType *external_types, int external_type_count);
+              const DescrType *external_types, int external_type_count,
+              int strip_check, int strip_invariant);
 
 /*
  * Generate a self-contained C11 header for all types in the program.

@@ -71,6 +71,18 @@ typedef struct {
 } ReturnStmt;
 
 typedef enum {
+    ASSERT_REQUIRE,
+    ASSERT_CHECK,
+    ASSERT_INVARIANT
+} AssertLevel;
+
+typedef struct {
+    AssertLevel level;
+    char *expr;         /* condition expression text */
+    char *message;      /* message string (may be NULL) */
+} AssertStmt;
+
+typedef enum {
     CHUNK_PASSTHROUGH,
     CHUNK_DESCR,
     CHUNK_ENUM,
@@ -79,7 +91,8 @@ typedef enum {
     CHUNK_DEFER,
     CHUNK_DEFER_CANCEL,
     CHUNK_RETURN,
-    CHUNK_FUNC_END      /* function closing brace with pending defers */
+    CHUNK_FUNC_END,     /* function closing brace with pending defers */
+    CHUNK_ASSERT
 } ChunkType;
 
 struct Chunk {
@@ -93,6 +106,7 @@ struct Chunk {
         DeferBlock defer;
         ReturnStmt ret;
         struct { int defer_count; } func_end;
+        AssertStmt assert_stmt;
     };
 };
 

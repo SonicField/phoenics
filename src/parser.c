@@ -928,6 +928,88 @@ ParseResult parse(const char *source) {
             }
             p.passthrough_start = p.lex.pos;
             p.cur = lexer_next(&p.lex);
+        } else if (p.cur.type == TOK_PHC_REQUIRE ||
+                   p.cur.type == TOK_PHC_CHECK ||
+                   p.cur.type == TOK_PHC_INVARIANT) {
+            /* phc_require(expr, "message"); */
+            add_passthrough(&p, p.passthrough_start, p.cur.pos);
+            AssertLevel level;
+            if (p.cur.type == TOK_PHC_REQUIRE) level = ASSERT_REQUIRE;
+            else if (p.cur.type == TOK_PHC_CHECK) level = ASSERT_CHECK;
+            else level = ASSERT_INVARIANT;
+
+            /* Find '(' after keyword */
+            size_t pos = p.cur.pos + p.cur.length;
+            while (pos < p.source_len && p.source[pos] == ' ') pos++;
+            if (pos >= p.source_len || p.source[pos] != '(') {
+                parser_error(&p, "expected '(' after assertion keyword");
+            } else {
+                pos++; /* skip '(' */
+                /* Find the comma separating expr from message, respecting parens */
+                size_t expr_start = pos;
+                int depth = 1;
+                size_t comma_pos = 0;
+                int found_comma = 0;
+                while (pos < p.source_len && depth > 0) {
+                    if (p.source[pos] == '(') depth++;
+                    else if (p.source[pos] == ')') { depth--; if (depth == 0) break; }
+                    else if (p.source[pos] == ',' && depth == 1 && !found_comma) {
+                        comma_pos = pos;
+                        found_comma = 1;
+                    }
+                    pos++;
+                }
+                size_t close_paren = pos;
+
+                /* Extract expression */
+                size_t expr_end = found_comma ? comma_pos : close_paren;
+                /* Trim whitespace */
+                while (expr_start < expr_end && (p.source[expr_start] == ' ' || p.source[expr_start] == '\t')) expr_start++;
+                while (expr_end > expr_start && (p.source[expr_end - 1] == ' ' || p.source[expr_end - 1] == '\t')) expr_end--;
+
+                char *expr = strndup(p.source + expr_start, expr_end - expr_start);
+
+                /* Extract message (if present) */
+                char *message = NULL;
+                if (found_comma) {
+                    size_t msg_start = comma_pos + 1;
+                    while (msg_start < close_paren && (p.source[msg_start] == ' ' || p.source[msg_start] == '\t')) msg_start++;
+                    /* Skip opening quote */
+                    if (msg_start < close_paren && p.source[msg_start] == '"') {
+                        msg_start++;
+                        size_t msg_end = msg_start;
+                        while (msg_end < close_paren && p.source[msg_end] != '"') {
+                            if (p.source[msg_end] == '\\' && msg_end + 1 < close_paren) msg_end++;
+                            msg_end++;
+                        }
+                        message = strndup(p.source + msg_start, msg_end - msg_start);
+                    }
+                }
+
+                /* Skip past closing ')' and ';' */
+                size_t after = close_paren + 1;
+                while (after < p.source_len && p.source[after] != ';') after++;
+                if (after < p.source_len) after++; /* skip ';' */
+
+                Chunk c;
+                memset(&c, 0, sizeof(c));
+                c.type = CHUNK_ASSERT;
+                c.assert_stmt.level = level;
+                c.assert_stmt.expr = expr;
+                c.assert_stmt.message = message;
+                DA_PUSH(p.chunks, p.chunk_count, p.chunk_cap, c);
+
+                /* Advance lexer */
+                while (p.lex.pos < after && p.lex.pos < p.lex.len) {
+                    if (p.lex.src[p.lex.pos] == '\n') {
+                        p.lex.line++; p.lex.col = 1;
+                        if (p.lex.marker_seen) p.lex.orig_line++;
+                    } else { p.lex.col++; }
+                    p.lex.pos++;
+                }
+                p.passthrough_start = p.lex.pos;
+                p.cur = lexer_next(&p.lex);
+            }
         } else if (p.cur.type == TOK_RETURN) {
             /* return <expr>; with active defer — rewrite to goto */
             add_passthrough(&p, p.passthrough_start, p.cur.pos);
@@ -1065,6 +1147,9 @@ void parse_result_free(ParseResult *result) {
             free_match_contents(&c->match);
         } else if (c->type == CHUNK_RETURN) {
             free(c->ret.expr);
+        } else if (c->type == CHUNK_ASSERT) {
+            free(c->assert_stmt.expr);
+            free(c->assert_stmt.message);
         }
         /* Note: CHUNK_DEFER body_text is freed via program.defers below */
     }

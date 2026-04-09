@@ -30,7 +30,7 @@ $(BUILDDIR)/phc: $(OBJS) | $(BUILDDIR)
 $(BUILDDIR)/test_%: $(TESTDIR)/unit/%.c $(LIB_OBJS) | $(BUILDDIR)
 	$(CC) $(CFLAGS) -I$(SRCDIR) $< $(LIB_OBJS) -o $@
 
-test: test-unit test-integration test-fidelity test-selfhost test-pipeline test-multifile test-line test-headergen test-stdlib-extern
+test: test-unit test-integration test-fidelity test-selfhost test-pipeline test-multifile test-line test-headergen test-stdlib-extern test-assert
 
 test-unit: $(UNIT_BINS)
 	@echo "=== Unit Tests ==="
@@ -70,6 +70,11 @@ test-headergen: $(BUILDDIR)/phc
 test-stdlib-extern: $(BUILDDIR)/phc
 	@echo "=== Standard Library Extern Tests ==="
 	@$(TESTDIR)/integration/stdlib_extern_test.sh $(BUILDDIR)/phc
+
+# Assertion tests (phc_require/phc_check/phc_invariant)
+test-assert: $(BUILDDIR)/phc
+	@echo "=== Assertion Tests ==="
+	@$(TESTDIR)/integration/assert_test.sh $(BUILDDIR)/phc
 
 # Self-hosting: phc must pass through its own source unchanged
 test-selfhost: $(BUILDDIR)/phc

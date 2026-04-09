@@ -22,6 +22,9 @@ typedef enum {
     TOK_BREAK,        /* 'break' keyword */
     TOK_PHC_DEFER,    /* 'phc_defer' keyword */
     TOK_PHC_DEFER_CANCEL, /* 'phc_defer_cancel' keyword */
+    TOK_PHC_REQUIRE,      /* 'phc_require' keyword */
+    TOK_PHC_CHECK,        /* 'phc_check' keyword */
+    TOK_PHC_INVARIANT,    /* 'phc_invariant' keyword */
     TOK_RETURN,       /* 'return' keyword (scan mode, only when defer active) */
     TOK_EQUALS,       /* = (for explicit enum values) */
     TOK_NUMBER,       /* integer literal */
