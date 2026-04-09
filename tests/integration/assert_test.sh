@@ -180,6 +180,22 @@ else
     fail "no stripped comment in output"
 fi
 
+# --- stripped comment does NOT leak expression or message ---
+run_test "stripped_comment_no_expr_leak"
+cat > "$TESTDIR/strip_leak.phc" <<'EOF'
+void f(int x) {
+    phc_check(x > 42, "secret check msg");
+    phc_invariant(x != 0, "nonzero guard msg");
+}
+EOF
+"$PHC" --strip-check --strip-invariant < "$TESTDIR/strip_leak.phc" > "$TESTDIR/strip_leak.c" 2>/dev/null || true
+# Messages and assertion-specific expressions must not appear in stripped output
+if grep -q 'secret check msg' "$TESTDIR/strip_leak.c" || grep -q 'nonzero guard msg' "$TESTDIR/strip_leak.c" || grep -q 'x > 42' "$TESTDIR/strip_leak.c" || grep -q 'x != 0' "$TESTDIR/strip_leak.c"; then
+    fail "assertion expression or message leaked into stripped output"
+else
+    pass
+fi
+
 # ============================================================
 # Section 3: Multiple assertions in one function
 # ============================================================
