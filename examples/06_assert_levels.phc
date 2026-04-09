@@ -1,0 +1,60 @@
+/* 06_assert_levels.phc — Assertions as falsification (phc_require/check/invariant)
+ *
+ * Build (all active):   phc < 06_assert_levels.phc | cc -x c - -o assert_all
+ * Build (strip checks): phc --strip-check < 06_assert_levels.phc | cc -x c - -o assert_release
+ * Build (strip both):   phc --strip-check --strip-invariant < 06_assert_levels.phc | cc -x c - -o assert_prod
+ * Run:                  ./assert_all 5
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+/* phc_require: ALWAYS active. Validates untrusted input at boundaries.
+ * Hypothesis: "the caller gave me valid input." Falsify on every call. */
+int safe_divide(int a, int b) {
+    phc_require(b != 0, "divisor must be nonzero");
+
+    int result = a / b;
+
+    /* phc_check: strippable. Validates our own code's output.
+     * Hypothesis: "my code produced a correct result." */
+    phc_check(result * b <= a, "division result overflow check");
+
+    return result;
+}
+
+/* phc_invariant: most strippable. Expensive structural checks.
+ * Hypothesis: "the data structure is consistent." */
+void process_array(int *arr, int len) {
+    phc_require(arr != NULL, "array must not be null");
+    phc_require(len > 0, "length must be positive");
+
+    /* Sort the array (simplified — just reverse for demo) */
+    for (int i = 0; i < len / 2; i++) {
+        int tmp = arr[i];
+        arr[i] = arr[len - 1 - i];
+        arr[len - 1 - i] = tmp;
+    }
+
+    /* Expensive check: verify the structural property we just established */
+    phc_invariant(arr[0] >= arr[len - 1], "array should be reversed");
+}
+
+int main(int argc, char **argv) {
+    if (argc < 2) {
+        printf("Usage: %s <number>\n", argv[0]);
+        return 1;
+    }
+    int n = atoi(argv[1]);
+
+    printf("100 / %d = %d\n", n, safe_divide(100, n));
+
+    int data[] = {1, 2, 3, 4, 5};
+    process_array(data, 5);
+    printf("reversed: %d %d %d %d %d\n",
+           data[0], data[1], data[2], data[3], data[4]);
+
+    /* Try: ./assert_all 0  — phc_require fires, program aborts
+     * Compile with --strip-check: phc_check removed, phc_require stays
+     * Compile with --strip-check --strip-invariant: only phc_require remains */
+    return 0;
+}

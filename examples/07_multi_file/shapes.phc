@@ -1,0 +1,19 @@
+/* shapes.phc — Type definitions shared across files
+ *
+ * Build: phc --emit-types=build/shapes.phc-types < shapes.phc > build/shapes.c
+ * This produces:
+ *   build/shapes.c         — C source with type definitions
+ *   build/shapes.phc-types — manifest for cross-file exhaustiveness
+ *   build/shapes.phc.h     — generated header for consumers
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+phc_descr Shape {
+    Circle { double radius; },
+    Square { double side; }
+};
+
+phc_enum Color {
+    Red, Green, Blue
+};

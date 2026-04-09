@@ -1,0 +1,54 @@
+/* 03_enum_colors.phc — Enhanced enums (phc_enum)
+ *
+ * Build: phc < 03_enum_colors.phc | cc -x c - -o enum_colors
+ * Run:   ./enum_colors
+ */
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+phc_enum Color {
+    Red,
+    Green,
+    Blue
+};
+
+/* Explicit values for wire protocols */
+phc_enum HttpStatus {
+    Ok = 200,
+    NotFound = 404,
+    ServerError = 500
+};
+
+int main(void) {
+    /* to_string: enum value -> string */
+    Color c = Color_Green;
+    printf("color: %s\n", Color_to_string(c));  /* Green */
+
+    /* from_string: string -> enum value */
+    Color parsed;
+    if (Color_from_string("Blue", &parsed)) {
+        printf("parsed: %s\n", Color_to_string(parsed));  /* Blue */
+    }
+
+    /* from_string returns 0 on unknown strings */
+    Color bad;
+    if (!Color_from_string("Purple", &bad)) {
+        printf("'Purple' is not a valid Color\n");
+    }
+
+    /* __COUNT: number of variants */
+    printf("Color has %d variants\n", Color__COUNT);  /* 3 */
+
+    /* Exhaustive matching (same as phc_descr, no destructuring) */
+    phc_match(Color, c) {
+        case Red:   { printf("stop!\n"); } break;
+        case Green: { printf("go!\n"); } break;
+        case Blue:  { printf("sky!\n"); } break;
+    }
+
+    /* Explicit values preserved */
+    printf("HttpStatus Ok = %d\n", HttpStatus_Ok);  /* 200 */
+
+    return 0;
+}

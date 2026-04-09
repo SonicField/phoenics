@@ -1,0 +1,51 @@
+/* 08_pipeline.phc — Post-preprocessor pipeline mode
+ *
+ * Build: cc -x c -E 08_pipeline.phc | phc | cc -x c - -o pipeline_demo
+ *
+ * In pipeline mode, the C preprocessor runs first (expanding #include,
+ * #define, #ifdef), then phc transforms the expanded output, then the
+ * compiler compiles the result. This is how phc integrates with real
+ * build systems — phc never needs to parse C headers itself.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Macros are resolved BEFORE phc sees the source */
+#define INITIAL_VALUE 42
+#define MAX_ITEMS 10
+
+phc_descr Result {
+    Ok { int value; },
+    Err { int code; }
+};
+
+const char *describe(Result r) {
+    phc_match(Result, r) {
+        case Ok(value): {
+            if (value > INITIAL_VALUE)
+                return "above initial";
+            return "at or below initial";
+        } break;
+        case Err(code): {
+            if (code < 0)
+                return "negative error";
+            return "positive error";
+        } break;
+    }
+    return "unknown";
+}
+
+int main(void) {
+    /* In pipeline mode, INITIAL_VALUE is already 42 before phc sees it */
+    Result ok = Result_mk_Ok(INITIAL_VALUE);
+    Result hi = Result_mk_Ok(100);
+    Result err = Result_mk_Err(-1);
+
+    printf("Ok(%d): %s\n", INITIAL_VALUE, describe(ok));
+    printf("Ok(100): %s\n", describe(hi));
+    printf("Err(-1): %s\n", describe(err));
+    printf("MAX_ITEMS = %d (macro resolved before phc)\n", MAX_ITEMS);
+
+    return 0;
+}

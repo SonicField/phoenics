@@ -1,0 +1,34 @@
+/* main.phc — Consumes types defined in shapes.phc
+ *
+ * Build: phc --type-manifest=build/shapes.phc-types < main.phc > build/main.c
+ *        cc -Ibuild build/main.c -o multi_file_demo
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include "shapes.phc.h"  /* generated header — type definitions + constructors */
+
+void describe(Shape s) {
+    phc_match(Shape, s) {
+        case Circle(radius): {
+            printf("circle with radius %.1f\n", radius);
+        } break;
+        case Square(side): {
+            printf("square with side %.1f\n", side);
+        } break;
+    }
+    /* Adding a variant to Shape in shapes.phc triggers a compile error
+     * here — exhaustiveness checked via the type manifest. */
+}
+
+int main(void) {
+    Shape c = Shape_mk_Circle(5.0);
+    Shape s = Shape_mk_Square(3.0);
+
+    describe(c);
+    describe(s);
+
+    Color col = Color_Green;
+    printf("color: %s\n", Color_to_string(col));
+
+    return 0;
+}

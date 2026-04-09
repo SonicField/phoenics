@@ -1,0 +1,63 @@
+/* 02_match_patterns.phc — Exhaustive matching and destructuring
+ *
+ * Build: phc < 02_match_patterns.phc | cc -x c - -o match_patterns
+ * Run:   ./match_patterns
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+phc_descr Expr {
+    Literal { int value; },
+    Add { int left; int right; },
+    Negate { int operand; }
+};
+
+/* Full destructuring: bind all fields by name */
+int eval(Expr e) {
+    phc_match(Expr, e) {
+        case Literal(value): {
+            return value;
+        } break;
+        case Add(left, right): {
+            return left + right;
+        } break;
+        case Negate(operand): {
+            return -operand;
+        } break;
+    }
+    return 0;
+}
+
+/* Partial destructuring: bind only what you need */
+void describe(Expr e) {
+    phc_match(Expr, e) {
+        case Literal(value): {
+            printf("  literal %d\n", value);
+        } break;
+        case Add: {
+            printf("  addition\n");  /* no destructuring — just dispatch */
+        } break;
+        case Negate(operand): {
+            printf("  negate %d\n", operand);
+        } break;
+    }
+}
+
+int main(void) {
+    Expr a = Expr_mk_Literal(42);
+    Expr b = Expr_mk_Add(10, 32);
+    Expr c = Expr_mk_Negate(7);
+
+    printf("eval(42)      = %d\n", eval(a));    /* 42 */
+    printf("eval(10 + 32) = %d\n", eval(b));    /* 42 */
+    printf("eval(-7)      = %d\n", eval(c));    /* -7 */
+
+    printf("\ndescribe:\n");
+    describe(a);
+    describe(b);
+    describe(c);
+
+    /* Adding a new variant to Expr would force every phc_match above
+     * to handle it — a compile error until updated. That's exhaustiveness. */
+    return 0;
+}

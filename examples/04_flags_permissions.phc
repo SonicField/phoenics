@@ -1,0 +1,49 @@
+/* 04_flags_permissions.phc — Type-safe bitflags (phc_flags)
+ *
+ * Build: phc < 04_flags_permissions.phc | cc -x c - -o flags_permissions
+ * Run:   ./flags_permissions
+ */
+#include <stdio.h>
+
+phc_flags Permissions {
+    Read,
+    Write,
+    Execute
+};
+
+void show_access(Permissions p) {
+    char buf[Permissions__MAX_STRING + 1];
+    printf("  flags: %s\n", Permissions_to_string(p, buf, sizeof(buf)));
+    printf("  read=%d write=%d exec=%d\n",
+           Permissions_has(p, Permissions_Read),
+           Permissions_has(p, Permissions_Write),
+           Permissions_has(p, Permissions_Execute));
+}
+
+int main(void) {
+    /* Combine flags with | */
+    Permissions rw = Permissions_Read | Permissions_Write;
+    printf("Read|Write:\n");
+    show_access(rw);
+
+    /* Set/clear individual flags */
+    Permissions p = 0;
+    p = Permissions_set(p, Permissions_Read);
+    p = Permissions_set(p, Permissions_Execute);
+    printf("\nAfter set Read+Execute:\n");
+    show_access(p);
+
+    p = Permissions_clear(p, Permissions_Read);
+    printf("\nAfter clear Read:\n");
+    show_access(p);
+
+    /* Zero flags */
+    printf("\nNo permissions:\n");
+    show_access(0);
+
+    /* __ALL: all flags set */
+    printf("\nAll permissions:\n");
+    show_access(Permissions__ALL);
+
+    return 0;
+}

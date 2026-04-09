@@ -1,0 +1,55 @@
+/* 05_defer_cleanup.phc — Automatic resource cleanup (phc_defer)
+ *
+ * Build: phc < 05_defer_cleanup.phc | cc -x c - -o defer_cleanup
+ * Run:   ./defer_cleanup
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* phc_defer fires on every function exit — cleanup is automatic */
+void demo_basic(void) {
+    int *p = malloc(sizeof(int));
+    phc_defer { free(p); printf("  freed p\n"); }
+
+    char *s = malloc(64);
+    phc_defer { free(s); printf("  freed s\n"); }
+
+    *p = 42;
+    strcpy(s, "hello");
+    printf("  p=%d s=%s\n", *p, s);
+    /* defers fire in reverse order: s freed first, then p */
+}
+
+/* phc_defer_cancel: transfer ownership to caller */
+char *make_string(int fail) {
+    char *result = malloc(64);
+    phc_defer { free(result); printf("  defer fired (error path)\n"); }
+
+    strcpy(result, "hello from make_string");
+
+    if (fail) {
+        printf("  error path — defer cleans up\n");
+        return NULL;  /* defer fires: result freed */
+    }
+
+    phc_defer_cancel;  /* success — caller takes ownership */
+    printf("  success path — ownership transferred\n");
+    return result;
+}
+
+int main(void) {
+    printf("basic defer (LIFO cleanup):\n");
+    demo_basic();
+
+    printf("\nmake_string (success):\n");
+    char *s1 = make_string(0);
+    printf("  got: %s\n", s1);
+    free(s1);
+
+    printf("\nmake_string (failure):\n");
+    char *s2 = make_string(1);
+    printf("  got: %s\n", s2 ? s2 : "NULL");
+
+    return 0;
+}

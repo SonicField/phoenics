@@ -1,0 +1,50 @@
+/* 01_descr_basics.phc — Discriminated unions (phc_descr)
+ *
+ * Build: phc < 01_descr_basics.phc | cc -x c - -o descr_basics
+ * Run:   ./descr_basics
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+/* A shape is one of three variants, each with different data */
+phc_descr Shape {
+    Circle { double radius; },
+    Rectangle { double width; double height; },
+    Triangle { double base; double height; }
+};
+
+/* Compute area using exhaustive matching */
+double area(Shape s) {
+    phc_match(Shape, s) {
+        case Circle(radius): {
+            return 3.14159 * radius * radius;
+        } break;
+        case Rectangle(width, height): {
+            return width * height;
+        } break;
+        case Triangle(base, height): {
+            return 0.5 * base * height;
+        } break;
+    }
+    return 0;
+}
+
+int main(void) {
+    /* Constructors: Shape_mk_<Variant>(...) */
+    Shape c = Shape_mk_Circle(5.0);
+    Shape r = Shape_mk_Rectangle(4.0, 3.0);
+    Shape t = Shape_mk_Triangle(6.0, 2.0);
+
+    printf("Circle area:    %.2f\n", area(c));    /* 78.54 */
+    printf("Rectangle area: %.2f\n", area(r));    /* 12.00 */
+    printf("Triangle area:  %.2f\n", area(t));    /* 6.00 */
+
+    /* Safe accessor: returns variant data by value (aborts if wrong variant) */
+    Shape_Circle_t ci = Shape_as_Circle(c);
+    printf("Circle radius:  %.1f\n", ci.radius);  /* 5.0 */
+
+    /* Direct field access via the union (no safety check) */
+    printf("Direct access:  %.1f\n", c.Circle.radius);  /* 5.0 */
+
+    return 0;
+}
