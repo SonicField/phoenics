@@ -348,6 +348,68 @@ else
     fail "surrounding code not preserved"
 fi
 
+# ============================================================
+# Section 8: Edge cases (comma-in-expression, assertion in phc_match)
+# ============================================================
+
+# Test 20: Comma in expression (function call with multiple args)
+run_test "comma_in_expression"
+cat > "$TESTDIR/comma_expr.phc" << 'EOF'
+static int max(int a, int b) { return a > b ? a : b; }
+int main(void) {
+    int x = 3, y = 5;
+    phc_require(max(x, y) > 0, "max must be positive");
+    phc_check(max(x, y) == 5, "max should be 5");
+    return 0;
+}
+EOF
+"$PHC" < "$TESTDIR/comma_expr.phc" > "$TESTDIR/comma_expr.c" 2>/dev/null
+if $CC $CFLAGS -o "$TESTDIR/comma_expr" "$TESTDIR/comma_expr.c" 2>/dev/null && \
+   "$TESTDIR/comma_expr" 2>/dev/null; then
+    pass
+else
+    fail "comma in expression broke parsing or execution"
+fi
+
+# Test 21: Assertion inside phc_match case body
+run_test "assertion_in_match_body"
+cat > "$TESTDIR/assert_match.phc" << 'EOF'
+phc_descr Shape {
+    Circle { double radius; },
+    Rect { double w; double h; }
+};
+double area(Shape s) {
+    double result = 0;
+    phc_match(Shape, s) {
+        case Circle(radius): {
+            phc_require(radius >= 0, "radius must be non-negative");
+            result = 3.14159 * radius * radius;
+        } break;
+        case Rect(w, h): {
+            phc_require(w >= 0, "width must be non-negative");
+            phc_require(h >= 0, "height must be non-negative");
+            result = w * h;
+        } break;
+    }
+    phc_check(result >= 0, "area must be non-negative");
+    return result;
+}
+int main(void) {
+    Shape c = Shape_mk_Circle(5.0);
+    Shape r = Shape_mk_Rect(3.0, 4.0);
+    area(c);
+    area(r);
+    return 0;
+}
+EOF
+"$PHC" < "$TESTDIR/assert_match.phc" > "$TESTDIR/assert_match.c" 2>/dev/null
+if $CC $CFLAGS -o "$TESTDIR/assert_match" "$TESTDIR/assert_match.c" 2>/dev/null && \
+   "$TESTDIR/assert_match" 2>/dev/null; then
+    pass
+else
+    fail "assertion inside phc_match body broke parsing or execution"
+fi
+
 # === Summary ===
 echo ""
 echo "  ========================================"
